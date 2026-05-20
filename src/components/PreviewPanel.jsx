@@ -8,7 +8,7 @@ import { POSE_BY_ID, PRESETS } from '../constants'
 
 export function PreviewPanel({
   generatedResults, isGenerating, modelImage, bgType, selectedPreset,
-  onDownload, onRegenerateSlot,
+  onDownload, onDownloadAll, onRegenerateSlot,
   caption, isCaptioning, onGenerateCaption, notify,
   cloudReady, generations, onSaveGeneration, onLoadGeneration, onDeleteGeneration,
 }) {
@@ -225,27 +225,36 @@ export function PreviewPanel({
               }
             </button>
             <div className="flex gap-2">
-              {cloudReady && (
-                <button
-                  onClick={handleSaveCurrent}
-                  disabled={isSavingGen}
-                  className="flex-1 bg-white border border-[#E5E5E5] text-ink font-semibold py-2.5 rounded-lg hover:border-ink transition-colors flex items-center justify-center gap-1.5 text-sm disabled:opacity-60"
-                  title="갤러리에 저장"
-                >
-                  {isSavingGen
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> 저장 중…</>
-                    : <><ImagePlus className="w-4 h-4" strokeWidth={2} /> 갤러리에 저장</>
-                  }
-                </button>
-              )}
               <button
                 onClick={() => onDownload(currentIndex)}
                 disabled={current?.status !== 'ok'}
                 className="flex-1 bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft disabled:bg-canvas-sunken disabled:text-ink-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
               >
-                <Download className="w-4 h-4" strokeWidth={2} /> 다운로드
+                <Download className="w-4 h-4" strokeWidth={2} /> 현재 컷 저장
               </button>
+              {generatedResults.length > 1 && (
+                <button
+                  onClick={onDownloadAll}
+                  disabled={!generatedResults.some((r) => r.status === 'ok')}
+                  className="flex-1 bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft disabled:bg-canvas-sunken disabled:text-ink-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
+                  title="모든 컷을 한 번에 저장"
+                >
+                  <Download className="w-4 h-4" strokeWidth={2} /> 전체 {generatedResults.filter((r) => r.status === 'ok').length}장 저장
+                </button>
+              )}
             </div>
+            {cloudReady && (
+              <button
+                onClick={handleSaveCurrent}
+                disabled={isSavingGen}
+                className="w-full bg-white border border-[#E5E5E5] text-ink-soft font-semibold py-2 rounded-lg hover:border-ink hover:text-ink transition-colors flex items-center justify-center gap-1.5 text-xs disabled:opacity-60"
+              >
+                {isSavingGen
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> 저장 중…</>
+                  : <><ImagePlus className="w-3.5 h-3.5" strokeWidth={2} /> 갤러리에 저장</>
+                }
+              </button>
+            )}
           </div>
         </article>
       ) : (

@@ -13,6 +13,7 @@ import { fetchAsDataUrl, fileToCompressedDataUrl } from './lib/image'
 import { generateImage } from './lib/gemini'
 import { buildShot, prepareImages } from './lib/promptBuilder'
 import { generateCaption } from './lib/captionGen'
+import { downloadAll, downloadUrl } from './lib/download'
 import { getFirebase } from './lib/firebase'
 import {
   CAROUSEL_RECOMMENDATIONS, GROUP_CAROUSEL_RECOMMENDATIONS,
@@ -289,13 +290,26 @@ export default function App() {
     }
   }
 
-  const handleDownload = (index) => {
+  const handleDownload = async (index) => {
     const url = generatedResults[index]?.url
     if (!url) return
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `Sponsor_Creator_${Date.now()}_${index + 1}.jpg`
-    link.click()
+    try {
+      await downloadUrl(url, `Sponsor_Creator_${Date.now()}_${index + 1}.jpg`)
+    } catch (e) {
+      notify(`다운로드 실패: ${e.message}`, 'error')
+    }
+  }
+
+  const handleDownloadAll = async () => {
+    const ok = generatedResults.filter((r) => r.status === 'ok' && r.url)
+    if (ok.length === 0) return notify('다운로드할 화보가 없습니다.', 'error')
+    notify(`${ok.length}장 다운로드 시작…`)
+    try {
+      await downloadAll(ok)
+      notify(`${ok.length}장 다운로드 완료`)
+    } catch (e) {
+      notify(`다운로드 실패: ${e.message}`, 'error')
+    }
   }
 
   return (
@@ -328,6 +342,7 @@ export default function App() {
           sharedCategory={sharedCategory}
           isGroup={isGroup}
           modelCount={modelCount}
+          hasReferenceImage={!!referenceImage}
           bgType={bgType}
           onBgTypeChange={setBgType}
           selectedPreset={selectedPreset}
@@ -351,6 +366,7 @@ export default function App() {
           bgType={bgType}
           selectedPreset={selectedPreset}
           onDownload={handleDownload}
+          onDownloadAll={handleDownloadAll}
           onRegenerateSlot={handleRegenerateSlot}
           caption={caption}
           isCaptioning={isCaptioning}

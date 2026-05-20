@@ -17,7 +17,7 @@ export function SourcePanel({
   const [pickerOpenAt, setPickerOpenAt] = useState(null)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileName, setProfileName] = useState('')
-  const [savingForIndex, setSavingForIndex] = useState(null) // index of model whose face we're saving
+  const [savingForIndex, setSavingForIndex] = useState(null)
 
   const handlePickProfile = async (inf) => {
     if (pickerOpenAt === null) return
@@ -40,9 +40,9 @@ export function SourcePanel({
 
   return (
     <div className="flex-1 lg:min-w-[340px] flex flex-col h-full bg-white border-r border-[#EAEAEA] shrink-0 relative">
-      <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar flex flex-col gap-3">
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between sticky top-0 bg-white z-10 -mx-4 px-4 sm:-mx-5 sm:px-5 -mt-4 pt-4 sm:-mt-5 sm:pt-5 pb-2 border-b border-[#EAEAEA]">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded-md bg-ink text-white text-[10px] font-bold flex items-center justify-center">1</div>
             <h2 className="text-sm font-semibold text-ink">소스 업로드</h2>
@@ -54,57 +54,62 @@ export function SourcePanel({
           </div>
         </div>
 
-        {/* ── Per-model outfit cards ───────────────── */}
-        {models.map((model, i) => (
-          <ModelCard
-            key={i}
-            index={i}
-            model={model}
-            isOnly={models.length === 1}
-            onUpdate={(patch) => onUpdateModel(i, patch)}
-            onRemove={() => onRemoveModel(i)}
-            onUploadFace={onUploadModelField(i, 'face')}
-            onUploadSponsor={onUploadModelField(i, 'sponsor')}
-            onUploadDetail={onUploadModelDetail(i)}
-            onRemoveDetail={(di) => onRemoveModelDetail(i, di)}
-            onOpenFacePicker={() => setPickerOpenAt(i)}
-            cloudReady={cloudReady}
-            isSavingProfile={savingForIndex === i}
-            onStartSaveProfile={() => { setSavingForIndex(i); setProfileName('') }}
-            onCancelSaveProfile={() => { setSavingForIndex(null); setProfileName('') }}
-            profileName={profileName}
-            onProfileNameChange={setProfileName}
-            onConfirmSaveProfile={() => handleSaveFaceProfile(i)}
-            savingProfile={savingProfile}
-          />
-        ))}
+        {/* ── Per-model outfit cards (compact) ────── */}
+        <div className="flex flex-col gap-2">
+          {models.map((model, i) => (
+            <ModelCard
+              key={i}
+              index={i}
+              model={model}
+              isOnly={models.length === 1}
+              onUpdate={(patch) => onUpdateModel(i, patch)}
+              onRemove={() => onRemoveModel(i)}
+              onUploadSponsor={onUploadModelField(i, 'sponsor')}
+              onUploadDetail={onUploadModelDetail(i)}
+              onRemoveDetail={(di) => onRemoveModelDetail(i, di)}
+              onOpenFacePicker={() => setPickerOpenAt(i)}
+              cloudReady={cloudReady}
+              isSavingProfile={savingForIndex === i}
+              onStartSaveProfile={() => { setSavingForIndex(i); setProfileName('') }}
+              onCancelSaveProfile={() => { setSavingForIndex(null); setProfileName('') }}
+              profileName={profileName}
+              onProfileNameChange={setProfileName}
+              onConfirmSaveProfile={() => handleSaveFaceProfile(i)}
+              savingProfile={savingProfile}
+            />
+          ))}
+        </div>
 
         {canAddMore && (
           <button
             onClick={onAddModel}
-            className="w-full py-3 border border-dashed border-[#D4D4D4] rounded-lg hover:border-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-2 text-ink-muted hover:text-accent text-xs font-semibold"
+            className="w-full py-2 border border-dashed border-[#D4D4D4] rounded-lg hover:border-accent hover:bg-accent/5 transition-all flex items-center justify-center gap-1.5 text-ink-muted hover:text-accent text-[11px] font-semibold"
           >
-            <UserPlus className="w-4 h-4" /> 인물 + 옷 한 세트 추가 ({models.length}/{maxModels})
+            <UserPlus className="w-3.5 h-3.5" /> 인물 + 옷 추가 ({models.length}/{maxModels})
           </button>
         )}
 
-        {/* ── Scene reference (shared across models) ──── */}
-        <div>
-          <label className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2 block">씬 참고 (선택)</label>
+        {/* ── Scene reference ──────────────────────── */}
+        <div className="pt-2">
+          <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1.5 block flex items-center gap-1">
+            <ImageIcon className="w-3 h-3" /> 씬 참고 (선택)
+          </label>
           <ImageDropzone
             onUpload={onReferenceUpload} image={referenceImage}
-            placeholder="포즈 / 무드 / 배경 참고"
+            placeholder="포즈·무드·배경 참고"
             icon={ImageIcon} className="aspect-[4/2]"
           />
-          <p className="text-[10px] text-ink-muted/70 mt-1.5 leading-relaxed">
-            이 이미지는 <span className="font-semibold text-ink-soft">포즈와 분위기</span>의 가이드로 쓰입니다. 사람·옷은 위 모델 카드에서 1:1로 매칭됩니다.
-          </p>
+          {referenceImage && (
+            <p className="text-[10px] text-accent mt-1.5 flex items-center gap-1 font-medium">
+              <CheckCircle2 className="w-3 h-3" /> 포즈에서 '씬 참고 그대로' 사용 가능
+            </p>
+          )}
         </div>
 
-        <div className="bg-accent/5 border border-accent/20 rounded-lg p-3 flex items-start gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-accent" strokeWidth={2} />
-          <p className="text-[11px] text-accent font-medium leading-relaxed">
-            각 인물은 자신이 매칭된 옷을 입은 채로 한 장면에 자연스럽게 등장합니다. 얼굴은 100% 일관되게 유지돼요.
+        <div className="bg-accent/5 border border-accent/20 rounded-lg p-2.5 flex items-start gap-2">
+          <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5 text-accent" strokeWidth={2} />
+          <p className="text-[10px] text-accent font-medium leading-relaxed">
+            각 인물은 자신이 매칭된 옷을 입고 한 장면에 자연스럽게 등장합니다.
           </p>
         </div>
       </div>
@@ -127,45 +132,145 @@ export function SourcePanel({
 
 function ModelCard({
   index, model, isOnly, onUpdate, onRemove,
-  onUploadFace, onUploadSponsor, onUploadDetail, onRemoveDetail,
+  onUploadSponsor, onUploadDetail, onRemoveDetail,
   onOpenFacePicker,
   cloudReady, isSavingProfile, onStartSaveProfile, onCancelSaveProfile,
   profileName, onProfileNameChange, onConfirmSaveProfile, savingProfile,
 }) {
-  const personLabel = index === 0 ? '메인 1' : `인물 ${index + 1}`
   const detailInputRef = useRef(null)
+  const sponsorInputRef = useRef(null)
 
-  const handleDetailMultiDrop = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleDetailDrop = (e) => {
+    e.preventDefault(); e.stopPropagation()
     const files = Array.from(e.dataTransfer.files).slice(0, 5 - model.details.length)
     files.forEach(onUploadDetail)
   }
 
+  const ready = model.face && model.sponsor
+  const cat = ITEM_CATEGORIES.find((c) => c.id === model.category)?.label
+
   return (
-    <div className="border border-[#E5E5E5] rounded-xl bg-white overflow-hidden shadow-studio">
-      {/* Header bar */}
-      <div className="px-3 py-2 bg-canvas-sunken/60 border-b border-[#EAEAEA] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-5 h-5 rounded-md bg-ink text-white text-[10px] font-bold flex items-center justify-center">{index + 1}</span>
-          <span className="text-[11px] font-semibold text-ink">{personLabel}</span>
+    <div className={`rounded-lg border bg-white overflow-hidden transition-all ${ready ? 'border-[#E5E5E5]' : 'border-[#FFE4B0] bg-[#FFFBF0]'}`}>
+      {/* Single tight row */}
+      <div className="flex items-center gap-2 p-2">
+        {/* Index chip */}
+        <div className="w-5 h-5 rounded-md bg-ink text-white text-[10px] font-bold flex items-center justify-center shrink-0">{index + 1}</div>
+
+        {/* Face mini */}
+        <button
+          onClick={onOpenFacePicker}
+          className={`w-12 h-12 rounded-md overflow-hidden shrink-0 relative group transition-all border ${
+            model.face ? 'border-[#E5E5E5] hover:border-ink' : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
+          }`}
+          title="얼굴 선택"
+        >
+          {model.face ? (
+            <img src={model.face} className="w-full h-full object-cover" alt={`Face ${index + 1}`} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-ink-muted/60">
+              <UserSquare2 className="w-5 h-5" strokeWidth={1.5} />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+            <span className="text-white text-[8px] font-bold">선택</span>
+          </div>
+        </button>
+
+        {/* Sponsor mini */}
+        <button
+          onClick={() => sponsorInputRef.current?.click()}
+          className={`w-12 h-12 rounded-md overflow-hidden shrink-0 relative group transition-all border ${
+            model.sponsor ? 'border-[#E5E5E5] hover:border-ink' : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
+          }`}
+          title="협찬 옷 업로드"
+        >
+          {model.sponsor ? (
+            <img src={model.sponsor} className="w-full h-full object-contain p-1 bg-canvas-sunken" alt={`Item ${index + 1}`} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-ink-muted/60">
+              <Shirt className="w-5 h-5" strokeWidth={1.5} />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+            <span className="text-white text-[8px] font-bold">{model.sponsor ? '교체' : '업로드'}</span>
+          </div>
+          <input
+            ref={sponsorInputRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadSponsor(f); e.target.value = '' }}
+          />
+        </button>
+
+        {/* Middle column: category + detail strip */}
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+          {/* Category pills */}
+          <div className="flex gap-0.5">
+            {ITEM_CATEGORIES.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => onUpdate({ category: c.id })}
+                className={`flex-1 py-0.5 text-[9px] font-semibold rounded transition-all ${
+                  model.category === c.id ? 'bg-ink text-white' : 'bg-canvas-sunken text-ink-muted hover:text-ink'
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Detail row */}
+          <div
+            className="flex items-center gap-1 min-h-[26px]"
+            onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+            onDrop={handleDetailDrop}
+          >
+            <span className="text-[9px] text-ink-muted shrink-0 font-medium tabular-nums">디테일</span>
+            <div className="flex gap-1 flex-wrap min-w-0">
+              {model.details.map((d, di) => (
+                <div key={di} className="w-6 h-6 shrink-0 relative rounded overflow-hidden border border-[#E5E5E5] group/d">
+                  <img src={d} className="w-full h-full object-cover" alt="" />
+                  <button
+                    onClick={() => onRemoveDetail(di)}
+                    className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover/d:opacity-100 flex items-center justify-center transition-opacity"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              ))}
+              {model.details.length < 5 && (
+                <button
+                  onClick={() => detailInputRef.current?.click()}
+                  className="w-6 h-6 shrink-0 border border-dashed border-[#D4D4D4] rounded flex items-center justify-center hover:bg-canvas-sunken hover:border-ink text-ink-muted"
+                >
+                  <Plus className="w-2.5 h-2.5" />
+                  <input
+                    ref={detailInputRef} type="file" multiple accept="image/*" className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files).slice(0, 5 - model.details.length)
+                      files.forEach(onUploadDetail); e.target.value = ''
+                    }}
+                  />
+                </button>
+              )}
+              <span className="text-[9px] text-ink-muted/60 ml-1 self-center tabular-nums">{model.details.length}/5</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          {ITEM_CATEGORIES.map((cat) => (
+
+        {/* Right column: save profile + remove */}
+        <div className="flex flex-col gap-1 shrink-0">
+          {cloudReady && model.face && !isSavingProfile && (
             <button
-              key={cat.id}
-              onClick={() => onUpdate({ category: cat.id })}
-              className={`py-0.5 px-1.5 text-[10px] font-semibold rounded transition-all ${
-                model.category === cat.id ? 'bg-ink text-white' : 'bg-white text-ink-muted hover:text-ink border border-[#E5E5E5]'
-              }`}
+              onClick={onStartSaveProfile}
+              className="p-1 text-ink-muted hover:text-accent transition-colors"
+              title="이 얼굴을 내 프로필로 저장"
             >
-              {cat.label}
+              <Save className="w-3 h-3" />
             </button>
-          ))}
+          )}
           {!isOnly && (
             <button
-              onClick={() => { if (confirm(`${personLabel} 제거?`)) onRemove() }}
-              className="p-1 text-ink-muted/60 hover:text-red-500 transition-colors ml-1"
+              onClick={() => { if (confirm(`인물 ${index + 1} 제거?`)) onRemove() }}
+              className="p-1 text-ink-muted hover:text-red-500 transition-colors"
               title="이 인물 제거"
             >
               <Trash2 className="w-3 h-3" />
@@ -174,115 +279,34 @@ function ModelCard({
         </div>
       </div>
 
-      {/* Face + Sponsor row */}
-      <div className="grid grid-cols-2 gap-2 p-2.5">
-        {/* Face */}
-        <div className="relative">
+      {/* Inline save profile form (expands when active) */}
+      {isSavingProfile && (
+        <div className="px-2 pb-2 flex gap-1.5 animate-fade-in border-t border-[#EAEAEA] pt-2">
+          <input
+            type="text" value={profileName}
+            onChange={(e) => onProfileNameChange(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && onConfirmSaveProfile()}
+            placeholder={`인물 ${index + 1} 프로필 이름`} autoFocus
+            className="flex-1 px-2 py-1 text-[11px] border border-[#E5E5E5] rounded bg-white outline-none focus:border-ink"
+          />
           <button
-            onClick={onOpenFacePicker}
-            className={`w-full aspect-square rounded-lg bg-canvas-sunken overflow-hidden relative group transition-all border ${
-              model.face ? 'border-[#E5E5E5] hover:border-ink' : 'border-dashed border-[#D4D4D4] hover:border-ink hover:bg-white'
-            }`}
+            onClick={onConfirmSaveProfile} disabled={savingProfile || !profileName.trim()}
+            className="px-2 py-1 text-[10px] font-semibold bg-ink text-white rounded hover:bg-ink-soft disabled:opacity-50 flex items-center gap-1"
           >
-            {model.face ? (
-              <img src={model.face} className="w-full h-full object-cover" alt={`Face ${index + 1}`} />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-ink-muted">
-                <UserSquare2 className="w-6 h-6" strokeWidth={1.5} />
-                <span className="text-[10px] font-semibold">얼굴</span>
-                <span className="text-[9px]">탭해서 선택</span>
-              </div>
-            )}
-            {model.face && (
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                <span className="text-white text-[10px] font-semibold">변경</span>
-              </div>
-            )}
+            {savingProfile ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Save className="w-2.5 h-2.5" />} 저장
+          </button>
+          <button onClick={onCancelSaveProfile} className="p-1 text-ink-muted hover:text-ink">
+            <X className="w-2.5 h-2.5" />
           </button>
         </div>
+      )}
 
-        {/* Sponsor item */}
-        <ImageDropzone
-          onUpload={onUploadSponsor}
-          image={model.sponsor}
-          placeholder="협찬 옷"
-          icon={Shirt}
-          className="aspect-square"
-          imgClassName="object-contain p-2 bg-canvas-sunken"
-        />
-      </div>
-
-      {/* Detail strip */}
-      <div className="px-2.5 pb-2.5">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider">옷 디테일 컷</span>
-          <span className="text-[10px] text-ink-muted tabular-nums">{model.details.length} / 5</span>
-        </div>
-        <div
-          className="flex flex-wrap gap-1.5 bg-canvas-sunken rounded-md p-1.5 border border-[#EAEAEA] min-h-[44px]"
-          onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
-          onDrop={handleDetailMultiDrop}
-        >
-          {model.details.map((d, di) => (
-            <div key={di} className="w-9 h-9 shrink-0 relative rounded overflow-hidden border border-[#E5E5E5] group">
-              <img src={d} className="w-full h-full object-cover" alt={`Detail ${di}`} />
-              <button
-                onClick={() => onRemoveDetail(di)}
-                className="absolute top-0 right-0 bg-black/70 text-white p-0.5 opacity-0 group-hover:opacity-100 transition-opacity rounded-bl"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          ))}
-          {model.details.length < 5 && (
-            <button
-              onClick={() => detailInputRef.current?.click()}
-              className="w-9 h-9 shrink-0 border border-dashed border-[#D4D4D4] rounded flex items-center justify-center cursor-pointer hover:bg-white hover:border-ink transition-colors text-ink-muted"
-            >
-              <Plus className="w-3 h-3" />
-              <input
-                ref={detailInputRef}
-                type="file" multiple accept="image/*" className="hidden"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files).slice(0, 5 - model.details.length)
-                  files.forEach(onUploadDetail); e.target.value = ''
-                }}
-              />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Save profile inline (collapsed by default) */}
-      {cloudReady && model.face && (
-        <div className="px-2.5 pb-2.5 -mt-1">
-          {!isSavingProfile ? (
-            <button
-              onClick={onStartSaveProfile}
-              className="text-[10px] font-semibold text-accent hover:text-accent/80 flex items-center gap-1"
-            >
-              <Save className="w-3 h-3" /> 이 얼굴을 내 프로필로 저장
-            </button>
-          ) : (
-            <div className="flex gap-1.5 animate-fade-in">
-              <input
-                type="text" value={profileName}
-                onChange={(e) => onProfileNameChange(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && onConfirmSaveProfile()}
-                placeholder="이름 (예: 모델 A)" autoFocus
-                className="flex-1 px-2 py-1 text-[10px] border border-[#E5E5E5] rounded bg-white outline-none focus:border-ink"
-              />
-              <button
-                onClick={onConfirmSaveProfile} disabled={savingProfile || !profileName.trim()}
-                className="px-2 py-1 text-[10px] font-semibold bg-ink text-white rounded hover:bg-ink-soft disabled:opacity-50 flex items-center gap-1"
-              >
-                {savingProfile ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Save className="w-2.5 h-2.5" />} 저장
-              </button>
-              <button onClick={onCancelSaveProfile} className="p-1 text-ink-muted hover:text-ink">
-                <X className="w-2.5 h-2.5" />
-              </button>
-            </div>
-          )}
+      {/* Incomplete hint */}
+      {!ready && (
+        <div className="px-2 pb-1.5 text-[9px] text-amber-700 font-medium">
+          {!model.face && !model.sponsor && '얼굴·옷 모두 필요'}
+          {!model.face && model.sponsor && '얼굴 추가 필요'}
+          {model.face && !model.sponsor && '옷 업로드 필요'}
         </div>
       )}
     </div>
@@ -296,7 +320,7 @@ function ProfilePicker({ seedProfiles, cloudProfiles, cloudReady, slotIndex, onP
     <div className="absolute inset-0 z-30 bg-black/30 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in" onClick={onClose}>
       <div className="bg-white w-full max-w-md sm:rounded-2xl rounded-t-2xl shadow-studio-lg max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#EAEAEA]">
-          <h3 className="text-sm font-semibold text-ink">{slotIndex === 0 ? '메인' : `인물 ${slotIndex + 1}`} 얼굴 선택</h3>
+          <h3 className="text-sm font-semibold text-ink">인물 {slotIndex + 1} 얼굴 선택</h3>
           <button onClick={onClose} className="text-ink-muted hover:text-ink p-1"><X className="w-4 h-4" /></button>
         </div>
 
@@ -328,7 +352,7 @@ function ProfilePicker({ seedProfiles, cloudProfiles, cloudReady, slotIndex, onP
             <div>
               <span className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider block mb-2">내가 저장한 프로필</span>
               {cloudProfiles.length === 0 ? (
-                <p className="text-[11px] text-ink-muted/70 italic py-3">없음 — 모델 얼굴을 슬롯에 올린 후 '내 프로필로 저장'을 눌러보세요.</p>
+                <p className="text-[11px] text-ink-muted/70 italic py-3">없음 — 모델 얼굴을 슬롯에 올린 후 디스켓 아이콘으로 저장하세요.</p>
               ) : (
                 <div className="grid grid-cols-4 gap-2">
                   {cloudProfiles.map((inf) => (

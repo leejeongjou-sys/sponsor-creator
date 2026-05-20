@@ -3,6 +3,13 @@
 // faceMatch: true면 얼굴 100% 매치, false면 얼굴 크롭 또는 뒷모습
 
 export const POSE_PRESETS = [
+  // SCENE-MATCH (참고 이미지 따라가기) ─────────────
+  {
+    id: 'scene_match', label: '씬 참고 그대로', emoji: '🎬', crop: 'full', faceMatch: true,
+    requiresReference: true,
+    en: 'CRITICAL: Strictly replicate the exact pose, body angle, camera angle, framing, and composition from the [Reference Image (Pose/Mood)]. The model(s) should appear in the same position, with the same body language and gestures, as in the reference. Match the framing crop as closely as possible (if the reference is full-body, do full-body; if it is half-body, do half-body).',
+  },
+
   // FULL BODY ──────────────────────────────────────
   {
     id: 'full_dynamic', label: '전신 다이내믹', emoji: '🚶‍♀️', crop: 'full', faceMatch: true,
@@ -104,15 +111,17 @@ export const QUICK_RECOMMENDATIONS = {
 }
 
 // 카테고리에서 사용 가능한 포즈 id 목록 (단일 인물 기준)
+// scene_match는 어느 카테고리에서나 선택 가능
 export const POSES_FOR_CATEGORY = {
   outer: POSE_PRESETS.filter((p) => p.crop !== 'lower' && !p.group).map((p) => p.id),
   top:   POSE_PRESETS.filter((p) => p.crop !== 'lower' && !p.group).map((p) => p.id),
   bottom:POSE_PRESETS.filter((p) => p.crop !== 'upper' && !p.group).map((p) => p.id),
 }
 
-// 다인 모드 전용 포즈 id 목록 (그룹 포즈 + 일반 풀바디 일부)
+// 다인 모드 전용 포즈 id 목록 (그룹 포즈 + 일반 풀바디 일부 + scene_match)
 export const GROUP_POSE_IDS = POSE_PRESETS.filter((p) => p.group).map((p) => p.id)
 export const POSES_FOR_GROUP = [
+  'scene_match',
   ...GROUP_POSE_IDS,
   'full_dynamic',
   'full_walking',

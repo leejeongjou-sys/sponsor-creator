@@ -12,6 +12,7 @@ export function DirectionPanel({
   selectedPoses, onSelectedPosesChange,
   sharedCategory,
   isGroup, modelCount,
+  hasReferenceImage,
   bgType, onBgTypeChange,
   selectedPreset, onPresetChange,
   customBgImage, onCustomBgUpload,
@@ -214,6 +215,7 @@ export function DirectionPanel({
         <PosePicker
           poses={availablePoses}
           currentId={selectedPoses[pickerOpenAt]}
+          hasReferenceImage={hasReferenceImage}
           onPick={handlePosePick}
           onClose={() => setPickerOpenAt(null)}
         />
@@ -222,7 +224,7 @@ export function DirectionPanel({
   )
 }
 
-function PosePicker({ poses, currentId, onPick, onClose }) {
+function PosePicker({ poses, currentId, hasReferenceImage, onPick, onClose }) {
   return (
     <div className="absolute inset-0 z-30 bg-black/30 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in" onClick={onClose}>
       <div
@@ -234,16 +236,32 @@ function PosePicker({ poses, currentId, onPick, onClose }) {
           <button onClick={onClose} className="text-ink-muted hover:text-ink p-1"><X className="w-4 h-4" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-3 grid grid-cols-3 gap-2 custom-scrollbar">
-          {poses.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => onPick(p.id)}
-              className={`p-3 rounded-lg border transition-all text-center ${currentId === p.id ? 'border-ink bg-ink text-white shadow-studio' : 'border-[#E5E5E5] bg-white hover:border-ink hover:shadow-studio'}`}
-            >
-              <div className="text-2xl leading-none mb-1.5">{p.emoji}</div>
-              <div className="text-[11px] font-semibold leading-tight">{p.label}</div>
-            </button>
-          ))}
+          {poses.map((p) => {
+            const disabled = p.requiresReference && !hasReferenceImage
+            return (
+              <button
+                key={p.id}
+                onClick={() => !disabled && onPick(p.id)}
+                disabled={disabled}
+                title={disabled ? '씬 참고 이미지를 먼저 업로드해주세요' : undefined}
+                className={`p-3 rounded-lg border transition-all text-center relative ${
+                  disabled
+                    ? 'border-[#E5E5E5] bg-canvas-sunken text-ink-muted cursor-not-allowed opacity-60'
+                    : currentId === p.id
+                      ? 'border-ink bg-ink text-white shadow-studio'
+                      : 'border-[#E5E5E5] bg-white hover:border-ink hover:shadow-studio'
+                }`}
+              >
+                <div className="text-2xl leading-none mb-1.5">{p.emoji}</div>
+                <div className="text-[11px] font-semibold leading-tight">{p.label}</div>
+                {p.requiresReference && (
+                  <div className={`text-[9px] mt-0.5 font-medium ${disabled ? 'text-red-500' : currentId === p.id ? 'text-white/70' : 'text-accent'}`}>
+                    {disabled ? '참고 필요' : '참고 사용'}
+                  </div>
+                )}
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>
