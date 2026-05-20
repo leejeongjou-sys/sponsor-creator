@@ -61,7 +61,7 @@ export function PreviewPanel({
   }
 
   return (
-    <div className="flex-1 lg:min-w-[320px] bg-canvas flex flex-col relative overflow-y-auto shrink-0 custom-scrollbar">
+    <div className="lg:flex-[2] flex-1 lg:min-w-[400px] bg-canvas flex flex-col relative overflow-y-auto shrink-0 custom-scrollbar">
       {cloudReady && (
         <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-[#EAEAEA] px-4 py-2 flex items-center gap-1">
           <button

@@ -91,13 +91,15 @@ export function SourcePanel({
 
         {/* ── Scene reference ──────────────────────── */}
         <div className="pt-2">
-          <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1.5 block flex items-center gap-1">
+          <label className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
             <ImageIcon className="w-3 h-3" /> 씬 참고 (선택)
           </label>
           <ImageDropzone
             onUpload={onReferenceUpload} image={referenceImage}
             placeholder="포즈·무드·배경 참고"
-            icon={ImageIcon} className="aspect-[4/2]"
+            icon={ImageIcon}
+            className="min-h-[180px] max-h-[280px]"
+            imgClassName="object-contain bg-canvas-sunken"
           />
           {referenceImage && (
             <p className="text-[10px] text-accent mt-1.5 flex items-center gap-1 font-medium">
@@ -147,69 +149,97 @@ function ModelCard({
   }
 
   const ready = model.face && model.sponsor
-  const cat = ITEM_CATEGORIES.find((c) => c.id === model.category)?.label
 
   return (
     <div className={`rounded-lg border bg-white overflow-hidden transition-all ${ready ? 'border-[#E5E5E5]' : 'border-[#FFE4B0] bg-[#FFFBF0]'}`}>
-      {/* Single tight row */}
-      <div className="flex items-center gap-2 p-2">
-        {/* Index chip */}
-        <div className="w-5 h-5 rounded-md bg-ink text-white text-[10px] font-bold flex items-center justify-center shrink-0">{index + 1}</div>
+      <div className="p-3">
+        {/* Top row: index + Face/Sponsor large + icons */}
+        <div className="flex items-start gap-3">
+          {/* Index chip */}
+          <div className="w-6 h-6 rounded-md bg-ink text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-1">{index + 1}</div>
 
-        {/* Face mini */}
-        <button
-          onClick={onOpenFacePicker}
-          className={`w-12 h-12 rounded-md overflow-hidden shrink-0 relative group transition-all border ${
-            model.face ? 'border-[#E5E5E5] hover:border-ink' : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
-          }`}
-          title="얼굴 선택"
-        >
-          {model.face ? (
-            <img src={model.face} className="w-full h-full object-cover" alt={`Face ${index + 1}`} />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-ink-muted/60">
-              <UserSquare2 className="w-5 h-5" strokeWidth={1.5} />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-            <span className="text-white text-[8px] font-bold">선택</span>
+          {/* Face — 2x size */}
+          <button
+            onClick={onOpenFacePicker}
+            className={`w-24 h-24 rounded-lg overflow-hidden shrink-0 relative group transition-all border ${
+              model.face ? 'border-[#E5E5E5] hover:border-ink shadow-studio' : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
+            }`}
+            title="얼굴 선택"
+          >
+            {model.face ? (
+              <img src={model.face} className="w-full h-full object-cover" alt={`Face ${index + 1}`} />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-ink-muted/60">
+                <UserSquare2 className="w-7 h-7" strokeWidth={1.5} />
+                <span className="text-[9px] font-semibold">얼굴 선택</span>
+              </div>
+            )}
+            {model.face && (
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                <span className="text-white text-[10px] font-bold">변경</span>
+              </div>
+            )}
+          </button>
+
+          {/* Sponsor — 2x size */}
+          <button
+            onClick={() => sponsorInputRef.current?.click()}
+            className={`w-24 h-24 rounded-lg overflow-hidden shrink-0 relative group transition-all border ${
+              model.sponsor ? 'border-[#E5E5E5] hover:border-ink shadow-studio' : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
+            }`}
+            title="협찬 옷 업로드"
+          >
+            {model.sponsor ? (
+              <img src={model.sponsor} className="w-full h-full object-contain p-1.5 bg-canvas-sunken" alt={`Item ${index + 1}`} />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-ink-muted/60">
+                <Shirt className="w-7 h-7" strokeWidth={1.5} />
+                <span className="text-[9px] font-semibold">옷 업로드</span>
+              </div>
+            )}
+            {model.sponsor && (
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                <span className="text-white text-[10px] font-bold">교체</span>
+              </div>
+            )}
+            <input
+              ref={sponsorInputRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadSponsor(f); e.target.value = '' }}
+            />
+          </button>
+
+          {/* Action icons — vertical stack on the right */}
+          <div className="flex flex-col gap-1 ml-auto">
+            {cloudReady && model.face && !isSavingProfile && (
+              <button
+                onClick={onStartSaveProfile}
+                className="p-1.5 text-ink-muted hover:text-accent transition-colors"
+                title="이 얼굴을 내 프로필로 저장"
+              >
+                <Save className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {!isOnly && (
+              <button
+                onClick={() => { if (confirm(`인물 ${index + 1} 제거?`)) onRemove() }}
+                className="p-1.5 text-ink-muted hover:text-red-500 transition-colors"
+                title="이 인물 제거"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-        </button>
+        </div>
 
-        {/* Sponsor mini */}
-        <button
-          onClick={() => sponsorInputRef.current?.click()}
-          className={`w-12 h-12 rounded-md overflow-hidden shrink-0 relative group transition-all border ${
-            model.sponsor ? 'border-[#E5E5E5] hover:border-ink' : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
-          }`}
-          title="협찬 옷 업로드"
-        >
-          {model.sponsor ? (
-            <img src={model.sponsor} className="w-full h-full object-contain p-1 bg-canvas-sunken" alt={`Item ${index + 1}`} />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-ink-muted/60">
-              <Shirt className="w-5 h-5" strokeWidth={1.5} />
-            </div>
-          )}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-            <span className="text-white text-[8px] font-bold">{model.sponsor ? '교체' : '업로드'}</span>
-          </div>
-          <input
-            ref={sponsorInputRef} type="file" accept="image/*" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadSponsor(f); e.target.value = '' }}
-          />
-        </button>
-
-        {/* Middle column: category + detail strip */}
-        <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-          {/* Category pills */}
-          <div className="flex gap-0.5">
+        {/* Bottom row: category pills + detail strip */}
+        <div className="mt-2.5 flex items-center gap-2">
+          <div className="flex gap-1 shrink-0">
             {ITEM_CATEGORIES.map((c) => (
               <button
                 key={c.id}
                 onClick={() => onUpdate({ category: c.id })}
-                className={`flex-1 py-0.5 text-[9px] font-semibold rounded transition-all ${
-                  model.category === c.id ? 'bg-ink text-white' : 'bg-canvas-sunken text-ink-muted hover:text-ink'
+                className={`py-1 px-2 text-[10px] font-semibold rounded transition-all ${
+                  model.category === c.id ? 'bg-ink text-white' : 'bg-canvas-sunken text-ink-muted hover:text-ink border border-[#E5E5E5]'
                 }`}
               >
                 {c.label}
@@ -217,31 +247,31 @@ function ModelCard({
             ))}
           </div>
 
-          {/* Detail row */}
+          {/* Detail strip */}
           <div
-            className="flex items-center gap-1 min-h-[26px]"
+            className="flex-1 flex items-center gap-1.5 min-w-0 pl-2 border-l border-[#EAEAEA]"
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
             onDrop={handleDetailDrop}
           >
-            <span className="text-[9px] text-ink-muted shrink-0 font-medium tabular-nums">디테일</span>
+            <span className="text-[9px] text-ink-muted shrink-0 font-semibold uppercase tracking-wider">디테일</span>
             <div className="flex gap-1 flex-wrap min-w-0">
               {model.details.map((d, di) => (
-                <div key={di} className="w-6 h-6 shrink-0 relative rounded overflow-hidden border border-[#E5E5E5] group/d">
+                <div key={di} className="w-12 h-12 shrink-0 relative rounded overflow-hidden border border-[#E5E5E5] group/d shadow-studio">
                   <img src={d} className="w-full h-full object-cover" alt="" />
                   <button
                     onClick={() => onRemoveDetail(di)}
                     className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover/d:opacity-100 flex items-center justify-center transition-opacity"
                   >
-                    <X className="w-2.5 h-2.5" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               ))}
               {model.details.length < 5 && (
                 <button
                   onClick={() => detailInputRef.current?.click()}
-                  className="w-6 h-6 shrink-0 border border-dashed border-[#D4D4D4] rounded flex items-center justify-center hover:bg-canvas-sunken hover:border-ink text-ink-muted"
+                  className="w-12 h-12 shrink-0 border border-dashed border-[#D4D4D4] rounded flex items-center justify-center hover:bg-canvas-sunken hover:border-ink text-ink-muted"
                 >
-                  <Plus className="w-2.5 h-2.5" />
+                  <Plus className="w-4 h-4" />
                   <input
                     ref={detailInputRef} type="file" multiple accept="image/*" className="hidden"
                     onChange={(e) => {
@@ -251,31 +281,9 @@ function ModelCard({
                   />
                 </button>
               )}
-              <span className="text-[9px] text-ink-muted/60 ml-1 self-center tabular-nums">{model.details.length}/5</span>
             </div>
+            <span className="text-[9px] text-ink-muted/60 ml-auto self-center tabular-nums shrink-0">{model.details.length}/5</span>
           </div>
-        </div>
-
-        {/* Right column: save profile + remove */}
-        <div className="flex flex-col gap-1 shrink-0">
-          {cloudReady && model.face && !isSavingProfile && (
-            <button
-              onClick={onStartSaveProfile}
-              className="p-1 text-ink-muted hover:text-accent transition-colors"
-              title="이 얼굴을 내 프로필로 저장"
-            >
-              <Save className="w-3 h-3" />
-            </button>
-          )}
-          {!isOnly && (
-            <button
-              onClick={() => { if (confirm(`인물 ${index + 1} 제거?`)) onRemove() }}
-              className="p-1 text-ink-muted hover:text-red-500 transition-colors"
-              title="이 인물 제거"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          )}
         </div>
       </div>
 

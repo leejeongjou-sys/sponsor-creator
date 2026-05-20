@@ -16,31 +16,76 @@ const buildBackgroundContext = ({ bgType, selectedPreset, referenceImage }) => {
     : 'Neutral clean studio background, minimalist.'
 }
 
+const IDENTITY_LOCK_DETAIL = `
+[FACIAL FEATURES — must match exactly]
+- Eye shape, eye color, eye spacing, eyelid type (monolid / double-lid)
+- Nose: bridge shape, tip shape, width, nostril shape
+- Mouth: lip shape, lip fullness, lip line, philtrum
+- Jawline, chin shape, cheekbones, forehead shape
+
+[HAIR — CRITICAL, often violated by AI models]
+- Exact same haircut and length
+- Exact same hair color and shade
+- Exact same parting position and direction
+- Exact same fringe / bangs / sideburns
+- Exact same hair texture (straight / wavy / curly) and volume
+- Even when hair is moved by wind or the pose, the underlying CUT must be identical
+- Hairline shape and density at temples / forehead must match
+
+[EYEBROWS — must match]
+- Exact shape, thickness, arch, color, density
+
+[SKIN]
+- Same skin tone, undertone, texture
+- Preserve any visible freckles, moles, or skin marks
+- Do NOT smooth or beautify beyond what the reference shows
+
+[OTHER]
+- Age, ethnicity, body proportions remain mathematically identical
+- Ear shape if visible
+- Treat the reference photo as a frozen identity template`
+
 const buildFaceRule = (faceMatch, modelCount) => {
   if (modelCount > 1) {
     if (faceMatch) {
       const personRules = Array.from({ length: modelCount }, (_, i) =>
-        `  - Person ${i + 1} MUST perfectly clone [Person ${i + 1} Face Image].`
+        `  - Person ${i + 1} → [Person ${i + 1} Face Image]`
       ).join('\n')
-      return `CRITICAL RULE 1: ABSOLUTE FACIAL IDENTITY CLONE FOR ALL ${modelCount} PEOPLE (100% MATCH REQUIRED)
-- This is a multi-person shot featuring exactly ${modelCount} people.
+      return `CRITICAL RULE 1: ABSOLUTE IDENTITY LOCK FOR ALL ${modelCount} PEOPLE — HIGHEST PRIORITY, OVERRIDES EVERYTHING ELSE
+
+This is a multi-person shot featuring exactly ${modelCount} people. Each person's complete identity from their reference image MUST be preserved:
 ${personRules}
-- Do NOT swap, blend, or mix the identities. Each person must remain themselves.
-- The age, ethnicity, eye shape, nose, lips, jawline of each person must remain mathematically identical to their reference.`
+
+DO NOT swap, blend, or mix identities between people. Each person remains themselves.
+${IDENTITY_LOCK_DETAIL}
+
+Even a tiny deviation in facial structure OR hairstyle is a critical failure. The pose, expression, environment, and lighting may all change — but the IDENTITY of every person must not.`
     }
-    return `CRITICAL RULE 1: STRICTLY FACELESS COMPOSITION (${modelCount} PEOPLE)
-- ${modelCount} people in shot but faces deliberately cropped out of frame.
-- Use the face images ONLY to match each body's skin tone. NO IDENTIFIABLE FACES.`
+    return `CRITICAL RULE 1: STRICTLY FACELESS COMPOSITION (${modelCount} PEOPLE) — BUT IDENTITY MARKERS STILL LOCKED
+
+Faces are deliberately cropped out of this shot. However, EVERY OTHER identity attribute must still match each person's reference image:
+- HAIR: even from behind or side, the exact haircut, length, color, parting, and texture must match each person's reference
+- BODY: proportions, skin tone, and build must match
+- HANDS: skin tone and proportions match
+
+NO frontal identifiable face. But hair and body MUST clearly be the same individuals as in the references.`
   }
 
   return faceMatch
-    ? `CRITICAL RULE 1: ABSOLUTE FACIAL IDENTITY CLONE (100% MATCH REQUIRED) — USER'S TOP PRIORITY
-- The generated model's face MUST perfectly clone the [Person 1 Face Image].
-- Do NOT alter eye shape, nose bridge, lip fullness, jawline, or skin tone.
-- The age, ethnicity, and exact facial micro-proportions must remain mathematically identical.`
-    : `CRITICAL RULE 1: STRICTLY FACELESS COMPOSITION
-- This specific shot deliberately crops out or hides the model's face.
-- Use the [Person 1 Face Image] ONLY to match the body's skin tone. NO IDENTIFIABLE FACE.`
+    ? `CRITICAL RULE 1: ABSOLUTE IDENTITY LOCK — HIGHEST PRIORITY, OVERRIDES EVERYTHING ELSE
+
+The generated person's complete identity from [Person 1 Face Image] MUST be preserved exactly:
+${IDENTITY_LOCK_DETAIL}
+
+Even a tiny deviation in facial structure OR hairstyle is a critical failure. The pose, expression, environment, and lighting may all change — but the IDENTITY must not.`
+    : `CRITICAL RULE 1: STRICTLY FACELESS COMPOSITION — BUT IDENTITY MARKERS STILL LOCKED
+
+The face is deliberately cropped out of this shot. However, every OTHER identity attribute from [Person 1 Face Image] must still match:
+- HAIR: even from behind or side, the exact haircut, length, color, parting, fringe, and texture must match the reference
+- BODY: same proportions, skin tone, build
+- HANDS: same skin tone and proportions
+
+NO identifiable face. But hair and body MUST clearly be the same individual as in the reference.`
 }
 
 const buildOutfitRule = (models) => {
