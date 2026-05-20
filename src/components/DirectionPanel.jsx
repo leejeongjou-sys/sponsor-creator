@@ -10,7 +10,7 @@ import {
 export function DirectionPanel({
   mode, onModeChange,
   selectedPoses, onSelectedPosesChange,
-  itemCategory,
+  sharedCategory,
   isGroup, modelCount,
   bgType, onBgTypeChange,
   selectedPreset, onPresetChange,
@@ -28,9 +28,15 @@ export function DirectionPanel({
     setPickerOpenAt(null)
   }
 
-  const availablePoseIds = isGroup
-    ? POSES_FOR_GROUP
-    : (POSES_FOR_CATEGORY[itemCategory] || POSES_FOR_CATEGORY.top)
+  // Pose pool selection logic:
+  //   - Group (2+ models): always group-pose pool
+  //   - Single model: filter by that model's category
+  //   - Multiple models w/ DIFFERENT categories: no filter (any pose ok)
+  //     This handles "model A wears top, model B wears bottom" gracefully.
+  let availablePoseIds
+  if (isGroup) availablePoseIds = POSES_FOR_GROUP
+  else if (sharedCategory) availablePoseIds = POSES_FOR_CATEGORY[sharedCategory] || POSES_FOR_CATEGORY.top
+  else availablePoseIds = POSE_PRESETS.map((p) => p.id) // mixed categories within group: show all
   const availablePoses = POSE_PRESETS.filter((p) => availablePoseIds.includes(p.id))
 
   return (

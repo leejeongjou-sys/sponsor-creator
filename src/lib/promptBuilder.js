@@ -1,6 +1,12 @@
-import { LIGHTING_OPTIONS, PRESETS, TIME_OPTIONS, POSE_BY_ID } from '../constants'
+import { LIGHTING_OPTIONS, PRESETS, TIME_OPTIONS, POSE_BY_ID, ITEM_CATEGORIES } from '../constants'
 
 const stripDataUrl = (dataUrl) => dataUrl.split(',')[1]
+
+const CATEGORY_LABEL_EN = {
+  top: 'top / shirt',
+  outer: 'outerwear / jacket',
+  bottom: 'bottom / pants / skirt',
+}
 
 const buildBackgroundContext = ({ bgType, selectedPreset, referenceImage }) => {
   if (bgType === 'preset') return PRESETS.find((p) => p.id === selectedPreset)?.en
@@ -11,64 +17,60 @@ const buildBackgroundContext = ({ bgType, selectedPreset, referenceImage }) => {
 }
 
 const buildFaceRule = (faceMatch, modelCount) => {
-  // ── Multi-person ──
   if (modelCount > 1) {
     if (faceMatch) {
       const personRules = Array.from({ length: modelCount }, (_, i) =>
-        `  - Person ${i + 1} MUST perfectly clone [Model ${i + 1} Face Image].`
+        `  - Person ${i + 1} MUST perfectly clone [Person ${i + 1} Face Image].`
       ).join('\n')
       return `CRITICAL RULE 1: ABSOLUTE FACIAL IDENTITY CLONE FOR ALL ${modelCount} PEOPLE (100% MATCH REQUIRED)
 - This is a multi-person shot featuring exactly ${modelCount} people.
 ${personRules}
 - Do NOT swap, blend, or mix the identities. Each person must remain themselves.
-- The age, ethnicity, eye shape, nose, lips, jawline of each person must remain mathematically identical to their reference.
-- If any person's face looks even slightly different from their reference, it is a critical failure.`
+- The age, ethnicity, eye shape, nose, lips, jawline of each person must remain mathematically identical to their reference.`
     }
-    return `CRITICAL RULE 1: STRICTLY FACELESS COMPOSITION (${modelCount} PEOPLE, FACES CROPPED)
-- This is a multi-person shot featuring ${modelCount} people, but their faces are deliberately cropped out of frame.
-- Use the model face images ONLY to match each body's skin tone. NO IDENTIFIABLE FACES.`
+    return `CRITICAL RULE 1: STRICTLY FACELESS COMPOSITION (${modelCount} PEOPLE)
+- ${modelCount} people in shot but faces deliberately cropped out of frame.
+- Use the face images ONLY to match each body's skin tone. NO IDENTIFIABLE FACES.`
   }
 
-  // ── Single person (legacy path, unchanged) ──
   return faceMatch
     ? `CRITICAL RULE 1: ABSOLUTE FACIAL IDENTITY CLONE (100% MATCH REQUIRED) — USER'S TOP PRIORITY
-- The generated model's face MUST perfectly clone the [Model 1 Face Image].
-- Do NOT alter the eye shape, nose bridge, lip fullness, jawline, or skin tone.
-- The age, ethnicity, and exact facial micro-proportions must remain mathematically identical.
-- If the model's face looks even slightly different, it is a critical failure.`
+- The generated model's face MUST perfectly clone the [Person 1 Face Image].
+- Do NOT alter eye shape, nose bridge, lip fullness, jawline, or skin tone.
+- The age, ethnicity, and exact facial micro-proportions must remain mathematically identical.`
     : `CRITICAL RULE 1: STRICTLY FACELESS COMPOSITION
 - This specific shot deliberately crops out or hides the model's face.
-- Do NOT show identifiable facial features. The shot must work even with no face shown.
-- Use the [Model 1 Face Image] ONLY to match the body's skin tone. NO IDENTIFIABLE FACE.`
+- Use the [Person 1 Face Image] ONLY to match the body's skin tone. NO IDENTIFIABLE FACE.`
 }
 
-const buildSponsorRule = (modelCount, detailCount) => {
-  const detailInfo = detailCount > 0
-    ? `\n- The user has provided ${detailCount} DETAIL IMAGES. You MUST strictly extract the fabric texture, brand logo, stitching, and micro-patterns from these details and apply them perfectly to the clothing.`
-    : ''
+const buildOutfitRule = (models) => {
+  // 1:1 mapping. Each person wears their own sponsor item from the matching detail set.
+  const lines = models.map((m, i) => {
+    const cat = CATEGORY_LABEL_EN[m.category] || 'clothing item'
+    const detailNote = m.details.length > 0
+      ? ` Refer to [Person ${i + 1} Sponsor Detail Images] for fabric/logo/stitching micro-patterns.`
+      : ''
+    return `  - Person ${i + 1}: MUST wear the exact ${cat} shown in [Person ${i + 1} Sponsor Item Image].${detailNote}`
+  }).join('\n')
 
-  if (modelCount > 1) {
-    return `CRITICAL RULE 2: SPONSOR ITEM INTEGRATION (PRIMARY WEARER)
-- Person 1 (the primary model) MUST be wearing the exact clothing/item shown in the [Sponsor Item Image].
-- The OTHER people are styled in plausible coordinated outfits — DO NOT put the sponsor item on more than one person.
-- Retain exact silhouette, color, and textile behavior of the sponsor item on Person 1.${detailInfo}`
-  }
-
-  return `CRITICAL RULE 2: SPONSOR ITEM INTEGRATION
-- The model must be wearing the exact clothing/item shown in the [Sponsor Item Image].
-- Retain exact silhouette, color, and textile behavior.${detailInfo}`
+  return `CRITICAL RULE 2: PER-PERSON OUTFIT (1:1 MAPPING — CRITICAL)
+- Each person is wearing a SPECIFIC sponsored item assigned to them. Do NOT swap items between people.
+${lines}
+- Retain exact silhouette, color, and textile behavior for each item.
+- If two people wear the same category (e.g. both wear tops), they MUST wear DIFFERENT items — never duplicate.`
 }
 
 const buildBasePrompt = ({
   pose, referenceImage, bgContext, timeContext, lightingContext,
-  detailCount, userDirection, modelCount,
+  userDirection, models,
 }) => {
+  const modelCount = models.length
   return `
 TASK: High-End Instagram Influencer Sponsorship Post Generation.
 
 ${buildFaceRule(pose.faceMatch, modelCount)}
 
-${buildSponsorRule(modelCount, detailCount)}
+${buildOutfitRule(models)}
 
 CRITICAL RULE 3: POSE & FRAMING
 - ${pose.en}${modelCount > 1 ? `\n- This is a ${modelCount === 2 ? 'COUPLE / DUO' : 'GROUP'} shot — frame to include all ${modelCount} people naturally within the composition.` : ''}
@@ -89,25 +91,21 @@ USER DIRECTION: ${userDirection || 'Make it look like a highly engaged, viral In
 }
 
 /**
- * Build a single content-parts array for one Gemini image generation call.
+ * Build content-parts for one Gemini image generation call.
  *
- * `images.models` is an array of base64 strings (no data: prefix), 1-4 entries.
- * The first entry is the primary sponsor item wearer.
+ * @param poseId   Pose preset id
+ * @param prepared Pre-stripped image data: { models: [{face, sponsor, details}], reference?, customBg? }
+ *                 (use prepareImages to produce this from raw dataUrls)
+ * @param models   Original model objects (only `.category` is read here — needed for prompt text)
  */
 export const buildShot = ({
-  poseId,
-  images, // { models: [], sponsor, details[], reference?, customBg? }
-  bgType,
-  selectedPreset,
-  referenceImage,
-  timeOfDay,
-  lighting,
-  prompt,
+  poseId, prepared, models,
+  bgType, selectedPreset, referenceImage,
+  timeOfDay, lighting, prompt,
 }) => {
   const pose = POSE_BY_ID[poseId]
   if (!pose) throw new Error(`Unknown pose: ${poseId}`)
-  const modelCount = images.models.length
-  if (modelCount === 0) throw new Error('At least one model face required.')
+  if (!prepared.models?.length) throw new Error('At least one model required.')
 
   const bgContext = buildBackgroundContext({ bgType, selectedPreset, referenceImage })
   const timeContext = TIME_OPTIONS.find((t) => t.id === timeOfDay)?.en
@@ -115,31 +113,41 @@ export const buildShot = ({
 
   const text = buildBasePrompt({
     pose, referenceImage, bgContext, timeContext, lightingContext,
-    detailCount: images.details.length, userDirection: prompt, modelCount,
+    userDirection: prompt,
+    models,
   })
 
   const parts = [{ text }]
-  // Model face images, numbered
-  images.models.forEach((face, i) => {
-    parts.push({ text: `\n[Model ${i + 1} Face Image]${i === 0 ? ' (primary sponsor wearer)' : ''}:` })
-    parts.push({ inlineData: { mimeType: 'image/jpeg', data: face } })
+
+  prepared.models.forEach((m, i) => {
+    parts.push({ text: `\n[Person ${i + 1} Face Image]:` })
+    parts.push({ inlineData: { mimeType: 'image/jpeg', data: m.face } })
+
+    parts.push({ text: `\n[Person ${i + 1} Sponsor Item Image] (category: ${CATEGORY_LABEL_EN[models[i].category] || 'clothing'}):` })
+    parts.push({ inlineData: { mimeType: 'image/jpeg', data: m.sponsor } })
+
+    if (m.details.length > 0) {
+      parts.push({ text: `\n[Person ${i + 1} Sponsor Detail Images (${m.details.length} pieces)]:` })
+      m.details.forEach((d) => parts.push({ inlineData: { mimeType: 'image/jpeg', data: d } }))
+    }
   })
-  parts.push({ text: '\n[Sponsor Item Image]:' })
-  parts.push({ inlineData: { mimeType: 'image/jpeg', data: images.sponsor } })
-  if (images.details.length > 0) {
-    parts.push({ text: `\n[${images.details.length} Sponsor Detail Images]:` })
-    images.details.forEach((d) => parts.push({ inlineData: { mimeType: 'image/jpeg', data: d } }))
-  }
-  if (images.reference) parts.push({ text: '\n[Reference Image (Pose/Mood)]:' }, { inlineData: { mimeType: 'image/jpeg', data: images.reference } })
-  if (images.customBg) parts.push({ text: '\n[Custom Background Reference Image]:' }, { inlineData: { mimeType: 'image/jpeg', data: images.customBg } })
+
+  if (prepared.reference) parts.push({ text: '\n[Reference Image (Pose/Mood)]:' }, { inlineData: { mimeType: 'image/jpeg', data: prepared.reference } })
+  if (prepared.customBg) parts.push({ text: '\n[Custom Background Reference Image]:' }, { inlineData: { mimeType: 'image/jpeg', data: prepared.customBg } })
 
   return parts
 }
 
-export const prepareImageStrips = ({ modelImages, sponsorImage, detailImages, referenceImage, customBgImage, bgType }) => ({
-  models: modelImages.filter(Boolean).map(stripDataUrl),
-  sponsor: stripDataUrl(sponsorImage),
-  details: detailImages.map(stripDataUrl),
+/**
+ * Strip data: prefix from every base64 image once, so we don't redo the work
+ * for every variation in a batch.
+ */
+export const prepareImages = ({ models, referenceImage, customBgImage, bgType }) => ({
+  models: models.map((m) => ({
+    face: stripDataUrl(m.face),
+    sponsor: stripDataUrl(m.sponsor),
+    details: m.details.map(stripDataUrl),
+  })),
   reference: referenceImage ? stripDataUrl(referenceImage) : null,
   customBg: bgType === 'custom' && customBgImage ? stripDataUrl(customBgImage) : null,
 })

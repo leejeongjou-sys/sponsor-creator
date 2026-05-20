@@ -8,7 +8,7 @@ import { POSE_BY_ID, PRESETS } from '../constants'
 
 export function PreviewPanel({
   generatedResults, isGenerating, modelImage, bgType, selectedPreset,
-  itemCategory, onDownload, onRegenerateSlot,
+  onDownload, onRegenerateSlot,
   caption, isCaptioning, onGenerateCaption, notify,
   cloudReady, generations, onSaveGeneration, onLoadGeneration, onDeleteGeneration,
 }) {

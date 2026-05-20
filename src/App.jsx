@@ -11,7 +11,7 @@ import { useInfluencers } from './hooks/useInfluencers'
 import { useGallery } from './hooks/useGallery'
 import { fetchAsDataUrl, fileToCompressedDataUrl } from './lib/image'
 import { generateImage } from './lib/gemini'
-import { buildShot, prepareImageStrips } from './lib/promptBuilder'
+import { buildShot, prepareImages } from './lib/promptBuilder'
 import { generateCaption } from './lib/captionGen'
 import { getFirebase } from './lib/firebase'
 import {
@@ -20,6 +20,7 @@ import {
 } from './constants'
 
 const MAX_MODELS = 4
+const emptyModel = () => ({ face: null, sponsor: null, details: [], category: 'top' })
 
 export default function App() {
   const user = useAuth()
@@ -30,13 +31,9 @@ export default function App() {
   const { influencers, saveInfluencer, deleteInfluencer } = useInfluencers(user)
   const { generations, saveGeneration, deleteGeneration } = useGallery(user)
 
-  // ── Source state ──
-  const [sponsorImage, setSponsorImage] = useState(null)
-  const [detailImages, setDetailImages] = useState([])
-  // modelImages: array (length 1..4). modelImages[0] = primary (sponsor wearer)
-  const [modelImages, setModelImages] = useState([null])
+  // ── Models (face + outfit per slot) ──
+  const [models, setModels] = useState([emptyModel()])
   const [referenceImage, setReferenceImage] = useState(null)
-  const [itemCategory, setItemCategory] = useState('top')
 
   // ── Direction state ──
   const [bgType, setBgType] = useState('none')
@@ -46,21 +43,25 @@ export default function App() {
   const [lighting, setLighting] = useState('none')
   const [prompt, setPrompt] = useState('')
 
+  const modelCount = models.length
+  const isGroup = modelCount > 1
+
+  // Derived category: if all models share one category, use it; else null (no filter)
+  const sharedCategory = models.every((m) => m.category === models[0].category) ? models[0].category : null
+
   // ── Mode + pose selection ──
   const [mode, setMode] = useState('quick')
   const [selectedPoses, setSelectedPoses] = useState(QUICK_RECOMMENDATIONS.top)
-
-  const modelCount = modelImages.filter(Boolean).length
-  const isGroup = modelCount > 1
 
   useEffect(() => {
     if (isGroup) {
       setSelectedPoses(mode === 'carousel' ? GROUP_CAROUSEL_RECOMMENDATIONS : GROUP_QUICK_RECOMMENDATIONS)
     } else {
+      const cat = sharedCategory || 'top'
       const map = mode === 'carousel' ? CAROUSEL_RECOMMENDATIONS : QUICK_RECOMMENDATIONS
-      setSelectedPoses(map[itemCategory] || map.top)
+      setSelectedPoses(map[cat] || map.top)
     }
-  }, [mode, itemCategory, isGroup])
+  }, [mode, sharedCategory, isGroup])
 
   // ── Generation state ──
   const [isGenerating, setIsGenerating] = useState(false)
@@ -70,68 +71,83 @@ export default function App() {
   const [caption, setCaption] = useState(null)
   const [isCaptioning, setIsCaptioning] = useState(false)
 
-  // ── Model slot management ──
-  const setModelAt = (index, value) => {
-    setModelImages((prev) => prev.map((m, i) => (i === index ? value : m)))
+  // ── Model slot mutators ──
+  const updateModel = (index, patch) => {
+    setModels((prev) => prev.map((m, i) => (i === index ? { ...m, ...patch } : m)))
   }
-  const uploadModelAt = (index) => async (file) => {
-    if (!file) return
-    try { setModelAt(index, await fileToCompressedDataUrl(file)) }
-    catch { notify('이미지 처리 실패', 'error') }
-  }
+
   const addModelSlot = () => {
-    setModelImages((prev) => (prev.length < MAX_MODELS ? [...prev, null] : prev))
+    setModels((prev) => (prev.length < MAX_MODELS ? [...prev, emptyModel()] : prev))
   }
   const removeModelSlot = (index) => {
-    setModelImages((prev) => {
-      if (prev.length <= 1) return prev
-      return prev.filter((_, i) => i !== index)
-    })
+    setModels((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))
+  }
+
+  // ── Upload helpers for a model slot ──
+  const uploadModelField = (index, field) => async (file) => {
+    if (!file) return
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file)
+      updateModel(index, { [field]: dataUrl })
+    } catch { notify('이미지 처리 실패', 'error') }
+  }
+  const uploadModelDetail = (index) => async (file) => {
+    if (!file) return
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file, 768, 0.8)
+      setModels((prev) => prev.map((m, i) => (
+        i === index && m.details.length < 5 ? { ...m, details: [...m.details, dataUrl] } : m
+      )))
+    } catch { notify('이미지 처리 실패', 'error') }
+  }
+  const removeModelDetail = (index, detailIndex) => {
+    setModels((prev) => prev.map((m, i) => (
+      i === index ? { ...m, details: m.details.filter((_, di) => di !== detailIndex) } : m
+    )))
   }
   const loadInfluencerAt = async (index, inf) => {
     if (!inf?.faceUrl) return
     try {
       const dataUrl = await fetchAsDataUrl(inf.faceUrl)
-      setModelAt(index, dataUrl)
+      updateModel(index, { face: dataUrl })
       notify(`'${inf.name}' 얼굴 불러옴`)
     } catch {
       notify('인플루언서 얼굴을 불러오지 못했어요', 'error')
     }
   }
 
-  // ── Upload handlers (single-slot dropzones) ──
+  // ── Reference / custom bg single uploads ──
   const uploadSingle = (setter) => async (file) => {
     if (!file) return
     try { setter(await fileToCompressedDataUrl(file)) }
     catch { notify('이미지 처리 실패', 'error') }
   }
-  const uploadDetail = async (file) => {
-    if (!file) return
-    try {
-      const data = await fileToCompressedDataUrl(file, 768, 0.8)
-      setDetailImages((prev) => (prev.length < 5 ? [...prev, data] : prev))
-    } catch { notify('이미지 처리 실패', 'error') }
-  }
 
-  const canGenerate = modelCount > 0 && !!sponsorImage
+  // ── Validation ──
+  const incompleteIndices = models
+    .map((m, i) => (m.face && m.sponsor ? -1 : i))
+    .filter((i) => i >= 0)
+  const canGenerate = incompleteIndices.length === 0
 
-  const validateAndPrepareImages = () => {
-    if (!canGenerate) { notify('인플루언서 1명 이상과 협찬 의상 이미지는 필수입니다.', 'error'); return null }
+  const validateAndPrepare = () => {
+    if (!canGenerate) {
+      const slots = incompleteIndices.map((i) => `${i + 1}번`).join(', ')
+      notify(`${slots} 모델에 얼굴과 협찬 의상을 모두 올려주세요.`, 'error')
+      return null
+    }
     if (bgType === 'custom' && !customBgImage) { notify('직접 업로드할 배경 이미지를 올려주세요.', 'error'); return null }
     if (!settings.apiKey) { notify('우측 상단에 API Key를 설정해주세요.', 'error'); return null }
-    return prepareImageStrips({
-      modelImages: modelImages.filter(Boolean),
-      sponsorImage, detailImages, referenceImage, customBgImage, bgType,
-    })
+    return prepareImages({ models, referenceImage, customBgImage, bgType })
   }
 
   const directionPayload = () => ({
     bgType, selectedPreset, referenceImage, timeOfDay, lighting, prompt,
   })
 
+  // ── Full batch generate ──
   const handleGenerate = async () => {
-    const images = validateAndPrepareImages()
-    if (!images) return
+    const prepared = validateAndPrepare()
+    if (!prepared) return
 
     setIsGenerating(true)
     setCaption(null)
@@ -144,7 +160,7 @@ export default function App() {
       const settled = await Promise.allSettled(
         selectedPoses.map((poseId) => generateImage({
           apiKey: settings.apiKey,
-          contentsParts: buildShot({ poseId, images, ...directionPayload() }),
+          contentsParts: buildShot({ poseId, prepared, models, ...directionPayload() }),
           aspectRatio: '4:5',
         }))
       )
@@ -175,9 +191,10 @@ export default function App() {
     }
   }
 
+  // ── Single slot regenerate ──
   const handleRegenerateSlot = async (slotIndex, overridePoseId = null) => {
-    const images = validateAndPrepareImages()
-    if (!images) return
+    const prepared = validateAndPrepare()
+    if (!prepared) return
 
     const poseId = overridePoseId || generatedResults[slotIndex]?.poseId
     if (!poseId) return
@@ -187,7 +204,7 @@ export default function App() {
     try {
       const url = await generateImage({
         apiKey: settings.apiKey,
-        contentsParts: buildShot({ poseId, images, ...directionPayload() }),
+        contentsParts: buildShot({ poseId, prepared, models, ...directionPayload() }),
         aspectRatio: '4:5',
       })
       setGeneratedResults((prev) => prev.map((r, i) => (i === slotIndex ? { url, poseId, status: 'ok' } : r)))
@@ -208,16 +225,21 @@ export default function App() {
     }
   }
 
+  // ── Gallery ──
   const handleSaveGeneration = async () => {
     const okShots = generatedResults.filter((r) => r.status === 'ok' && r.url)
     if (okShots.length === 0) return notify('저장할 화보가 없습니다.', 'error')
     try {
+      // Snapshot stores only category-level metadata (not the heavy images themselves)
+      const settingsSnapshot = {
+        mode, selectedPoses, bgType, selectedPreset,
+        timeOfDay, lighting, prompt,
+        modelCount,
+        categories: models.map((m) => m.category),
+      }
       await saveGeneration({
         shots: okShots.map((r) => ({ url: r.url, poseId: r.poseId })),
-        settings: {
-          mode, selectedPoses, itemCategory, bgType, selectedPreset,
-          timeOfDay, lighting, prompt, modelCount,
-        },
+        settings: settingsSnapshot,
         caption,
       })
       notify('갤러리에 저장 완료')
@@ -231,7 +253,6 @@ export default function App() {
     setGeneratedResults(gen.shots.map((s) => ({ url: s.url, poseId: s.poseId, status: 'ok' })))
     if (gen.caption) setCaption(gen.caption)
     const s = gen.settings || {}
-    if (s.itemCategory) setItemCategory(s.itemCategory)
     if (s.bgType) setBgType(s.bgType)
     if (s.selectedPreset) setSelectedPreset(s.selectedPreset)
     if (s.timeOfDay) setTimeOfDay(s.timeOfDay)
@@ -239,7 +260,8 @@ export default function App() {
     if (typeof s.prompt === 'string') setPrompt(s.prompt)
     if (s.mode) setMode(s.mode)
     if (Array.isArray(s.selectedPoses)) setSelectedPoses(s.selectedPoses)
-    notify('갤러리에서 불러옴')
+    // Note: model images are not restored (privacy/storage). User can re-upload.
+    notify('갤러리에서 불러옴 (모델·옷은 다시 올려주세요)')
   }
 
   const handleDeleteGeneration = async (gen) => {
@@ -247,13 +269,15 @@ export default function App() {
     catch (e) { notify(`삭제 실패: ${e.message}`, 'error') }
   }
 
+  // ── Caption — primary category drives the brand tone ──
   const handleGenerateCaption = async () => {
     if (!settings.apiKey) return notify('우측 상단에 API Key를 설정해주세요.', 'error')
     setIsCaptioning(true)
     try {
       const result = await generateCaption({
         apiKey: settings.apiKey,
-        itemCategory, bgType, selectedPreset, timeOfDay, lighting,
+        itemCategory: sharedCategory || models[0]?.category || 'top',
+        bgType, selectedPreset, timeOfDay, lighting,
         userDirection: prompt,
       })
       setCaption(result)
@@ -280,21 +304,17 @@ export default function App() {
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden w-full">
         <SourcePanel
-          sponsorImage={sponsorImage}
-          onSponsorUpload={uploadSingle(setSponsorImage)}
-          detailImages={detailImages}
-          onDetailUpload={uploadDetail}
-          onDetailRemove={(i) => setDetailImages((prev) => prev.filter((_, idx) => idx !== i))}
-          modelImages={modelImages}
-          onModelUploadAt={(i) => uploadModelAt(i)}
-          onModelRemoveAt={removeModelSlot}
-          onLoadInfluencerAt={loadInfluencerAt}
-          onAddModelSlot={addModelSlot}
+          models={models}
           maxModels={MAX_MODELS}
+          onUpdateModel={updateModel}
+          onAddModel={addModelSlot}
+          onRemoveModel={removeModelSlot}
+          onUploadModelField={uploadModelField}
+          onUploadModelDetail={uploadModelDetail}
+          onRemoveModelDetail={removeModelDetail}
+          onLoadInfluencerAt={loadInfluencerAt}
           referenceImage={referenceImage}
           onReferenceUpload={uploadSingle(setReferenceImage)}
-          itemCategory={itemCategory}
-          onItemCategoryChange={setItemCategory}
           cloudReady={cloudReady}
           cloudInfluencers={influencers}
           onSaveInfluencer={handleSaveInfluencer}
@@ -305,7 +325,7 @@ export default function App() {
           onModeChange={setMode}
           selectedPoses={selectedPoses}
           onSelectedPosesChange={setSelectedPoses}
-          itemCategory={itemCategory}
+          sharedCategory={sharedCategory}
           isGroup={isGroup}
           modelCount={modelCount}
           bgType={bgType}
@@ -327,10 +347,9 @@ export default function App() {
         <PreviewPanel
           generatedResults={generatedResults}
           isGenerating={isGenerating}
-          modelImage={modelImages[0]}
+          modelImage={models[0]?.face}
           bgType={bgType}
           selectedPreset={selectedPreset}
-          itemCategory={itemCategory}
           onDownload={handleDownload}
           onRegenerateSlot={handleRegenerateSlot}
           caption={caption}
