@@ -7,7 +7,10 @@ import { Notification } from './components/Notification'
 import { useAuth } from './hooks/useAuth'
 import { useSettings } from './hooks/useSettings'
 import { useNotification } from './hooks/useNotification'
-import { fileToCompressedDataUrl } from './lib/image'
+import { useInfluencers } from './hooks/useInfluencers'
+import { useGallery } from './hooks/useGallery'
+import { fetchAsDataUrl, fileToCompressedDataUrl } from './lib/image'
+import { getFirebase } from './lib/firebase'
 import { generateImage } from './lib/gemini'
 import { buildShot, prepareImageStrips } from './lib/promptBuilder'
 import { generateCaption } from './lib/captionGen'
@@ -17,6 +20,11 @@ export default function App() {
   const user = useAuth()
   const [settings, setSettings] = useSettings(user)
   const { notification, notify } = useNotification()
+
+  // Cloud features are available only when Firebase Storage is configured
+  const cloudReady = !!(user?.uid && getFirebase().storage)
+  const { influencers, saveInfluencer, deleteInfluencer } = useInfluencers(user)
+  const { generations, saveGeneration, deleteGeneration } = useGallery(user)
 
   // ── Source state ──
   const [sponsorImage, setSponsorImage] = useState(null)
@@ -150,6 +158,69 @@ export default function App() {
     }
   }
 
+  // ── Influencer profile ──
+  const handleSaveInfluencer = async ({ name, faceDataUrl }) => {
+    try {
+      await saveInfluencer({ name, faceDataUrl })
+      notify(`'${name}' 인플루언서 저장됨`)
+    } catch (e) {
+      notify(String(e.message), 'error')
+      throw e
+    }
+  }
+
+  const handleLoadInfluencer = async (inf) => {
+    if (!inf?.faceUrl) return
+    try {
+      const dataUrl = await fetchAsDataUrl(inf.faceUrl)
+      setModelImage(dataUrl)
+      notify(`'${inf.name}' 얼굴 불러옴`)
+    } catch (e) {
+      notify('인플루언서 얼굴을 불러오지 못했어요', 'error')
+    }
+  }
+
+  // ── Gallery (save current generation) ──
+  const handleSaveGeneration = async () => {
+    const okShots = generatedResults.filter((r) => r.status === 'ok' && r.url)
+    if (okShots.length === 0) return notify('저장할 화보가 없습니다.', 'error')
+    try {
+      await saveGeneration({
+        shots: okShots.map((r) => ({ url: r.url, poseId: r.poseId })),
+        settings: {
+          mode, selectedPoses, itemCategory, bgType, selectedPreset,
+          timeOfDay, lighting, prompt,
+        },
+        caption,
+      })
+      notify('갤러리에 저장 완료')
+    } catch (e) {
+      notify(`갤러리 저장 실패: ${e.message}`, 'error')
+    }
+  }
+
+  const handleLoadGeneration = (gen) => {
+    if (!gen?.shots?.length) return
+    setGeneratedResults(gen.shots.map((s) => ({ url: s.url, poseId: s.poseId, status: 'ok' })))
+    if (gen.caption) setCaption(gen.caption)
+    // Restore the settings snapshot so re-generation uses the same context
+    const s = gen.settings || {}
+    if (s.itemCategory) setItemCategory(s.itemCategory)
+    if (s.bgType) setBgType(s.bgType)
+    if (s.selectedPreset) setSelectedPreset(s.selectedPreset)
+    if (s.timeOfDay) setTimeOfDay(s.timeOfDay)
+    if (s.lighting) setLighting(s.lighting)
+    if (typeof s.prompt === 'string') setPrompt(s.prompt)
+    if (s.mode) setMode(s.mode)
+    if (Array.isArray(s.selectedPoses)) setSelectedPoses(s.selectedPoses)
+    notify('갤러리에서 불러옴')
+  }
+
+  const handleDeleteGeneration = async (gen) => {
+    try { await deleteGeneration(gen); notify('갤러리에서 삭제됨') }
+    catch (e) { notify(`삭제 실패: ${e.message}`, 'error') }
+  }
+
   // ── Caption generation ──
   const handleGenerateCaption = async () => {
     if (!settings.apiKey) return notify('우측 상단에 API Key를 설정해주세요.', 'error')
@@ -196,6 +267,11 @@ export default function App() {
           onReferenceUpload={uploadSingle(setReferenceImage)}
           itemCategory={itemCategory}
           onItemCategoryChange={setItemCategory}
+          cloudReady={cloudReady}
+          influencers={influencers}
+          onSaveInfluencer={handleSaveInfluencer}
+          onLoadInfluencer={handleLoadInfluencer}
+          onDeleteInfluencer={(inf) => deleteInfluencer(inf).catch(() => notify('삭제 실패', 'error'))}
         />
         <DirectionPanel
           mode={mode}
@@ -232,6 +308,11 @@ export default function App() {
           isCaptioning={isCaptioning}
           onGenerateCaption={handleGenerateCaption}
           notify={notify}
+          cloudReady={cloudReady}
+          generations={generations}
+          onSaveGeneration={handleSaveGeneration}
+          onLoadGeneration={handleLoadGeneration}
+          onDeleteGeneration={handleDeleteGeneration}
         />
       </div>
 

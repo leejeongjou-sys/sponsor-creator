@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AlertTriangle, Bookmark, Camera, ChevronLeft, ChevronRight, Check, Copy,
-  Download, Hash, Heart, Loader2, MessageCircle, MessageSquareText,
-  MoreHorizontal, RefreshCw, Send, Sparkles, ZoomIn,
+  Download, FolderOpen, Hash, Heart, ImagePlus, Loader2, MessageCircle, MessageSquareText,
+  MoreHorizontal, RefreshCw, Send, Sparkles, Trash2, ZoomIn,
 } from 'lucide-react'
 import { POSE_BY_ID, PRESETS } from '../constants'
 
@@ -10,7 +10,10 @@ export function PreviewPanel({
   generatedResults, isGenerating, modelImage, bgType, selectedPreset,
   itemCategory, onDownload, onRegenerateSlot,
   caption, isCaptioning, onGenerateCaption, notify,
+  cloudReady, generations, onSaveGeneration, onLoadGeneration, onDeleteGeneration,
 }) {
+  const [activeTab, setActiveTab] = useState('current') // 'current' | 'gallery'
+  const [isSavingGen, setIsSavingGen] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isZoomed, setIsZoomed] = useState(false)
   const [pan, setPan] = useState({ isDragging: false, startX: 0, startY: 0, tX: 0, tY: 0 })
@@ -51,9 +54,34 @@ export function PreviewPanel({
   const current = generatedResults[currentIndex]
   const currentPose = current ? POSE_BY_ID[current.poseId] : null
 
+  const handleSaveCurrent = async () => {
+    setIsSavingGen(true)
+    try { await onSaveGeneration() }
+    finally { setIsSavingGen(false) }
+  }
+
   return (
     <div className="flex-1 lg:min-w-[320px] bg-canvas flex flex-col relative overflow-y-auto shrink-0 custom-scrollbar">
-      {isGenerating && !hasResults ? (
+      {cloudReady && (
+        <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-[#EAEAEA] px-4 py-2 flex items-center gap-1">
+          <button
+            onClick={() => setActiveTab('current')}
+            className={`flex-1 py-1.5 text-[11px] font-semibold rounded-md transition-all ${activeTab === 'current' ? 'bg-canvas-sunken text-ink' : 'text-ink-muted hover:text-ink'}`}
+          >
+            현재 작업
+          </button>
+          <button
+            onClick={() => setActiveTab('gallery')}
+            className={`flex-1 py-1.5 text-[11px] font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${activeTab === 'gallery' ? 'bg-canvas-sunken text-ink' : 'text-ink-muted hover:text-ink'}`}
+          >
+            <FolderOpen className="w-3 h-3" /> 갤러리 ({generations.length})
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'gallery' && cloudReady ? (
+        <GalleryView generations={generations} onLoad={onLoadGeneration} onDelete={onDeleteGeneration} />
+      ) : isGenerating && !hasResults ? (
         <LoadingState modelImage={modelImage} />
       ) : hasResults ? (
         <article className="w-full max-w-[470px] mx-auto bg-white sm:border sm:border-[#EAEAEA] sm:my-6 flex flex-col animate-scale-in sm:rounded-xl overflow-hidden shadow-studio">
@@ -196,13 +224,28 @@ export function PreviewPanel({
                 : <><Sparkles className="w-4 h-4" strokeWidth={2} /> {caption ? '캡션 다시 생성' : '캡션·해시태그 자동 생성'}</>
               }
             </button>
-            <button
-              onClick={() => onDownload(currentIndex)}
-              disabled={current?.status !== 'ok'}
-              className="w-full bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft disabled:bg-canvas-sunken disabled:text-ink-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
-            >
-              <Download className="w-4 h-4" strokeWidth={2} /> 현재 화보 저장하기
-            </button>
+            <div className="flex gap-2">
+              {cloudReady && (
+                <button
+                  onClick={handleSaveCurrent}
+                  disabled={isSavingGen}
+                  className="flex-1 bg-white border border-[#E5E5E5] text-ink font-semibold py-2.5 rounded-lg hover:border-ink transition-colors flex items-center justify-center gap-1.5 text-sm disabled:opacity-60"
+                  title="갤러리에 저장"
+                >
+                  {isSavingGen
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> 저장 중…</>
+                    : <><ImagePlus className="w-4 h-4" strokeWidth={2} /> 갤러리에 저장</>
+                  }
+                </button>
+              )}
+              <button
+                onClick={() => onDownload(currentIndex)}
+                disabled={current?.status !== 'ok'}
+                className="flex-1 bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft disabled:bg-canvas-sunken disabled:text-ink-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
+              >
+                <Download className="w-4 h-4" strokeWidth={2} /> 다운로드
+              </button>
+            </div>
           </div>
         </article>
       ) : (
@@ -349,6 +392,72 @@ function LoadingState({ modelImage }) {
         <div className="h-3 w-1/2 bg-canvas-sunken rounded animate-pulse" />
       </div>
     </article>
+  )
+}
+
+function GalleryView({ generations, onLoad, onDelete }) {
+  if (generations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center text-ink-muted h-full w-full text-center p-8">
+        <div className="w-20 h-20 rounded-full border-2 border-[#E5E5E5] flex items-center justify-center mb-4 bg-white">
+          <FolderOpen className="w-8 h-8 text-ink-muted/50" strokeWidth={1.5} />
+        </div>
+        <h2 className="text-base font-semibold text-ink-soft mb-2">갤러리가 비어 있어요</h2>
+        <p className="text-sm font-normal text-ink-muted leading-relaxed">
+          화보를 만들고 <span className="text-ink font-semibold">갤러리에 저장</span> 버튼으로<br />여기 보관할 수 있습니다.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 sm:p-6 grid grid-cols-2 gap-3 animate-fade-in">
+      {generations.map((gen) => (
+        <GalleryCard key={gen.id} gen={gen} onLoad={onLoad} onDelete={onDelete} />
+      ))}
+    </div>
+  )
+}
+
+function GalleryCard({ gen, onLoad, onDelete }) {
+  const firstShot = gen.shots?.[0]
+  const shotCount = gen.shots?.length || 0
+  const date = gen.createdAt?.toDate ? gen.createdAt.toDate() : null
+  const dateLabel = date ? `${date.getMonth() + 1}/${date.getDate()}` : ''
+
+  return (
+    <div className="bg-white border border-[#EAEAEA] rounded-lg overflow-hidden shadow-studio group">
+      <button
+        onClick={() => onLoad(gen)}
+        className="block w-full aspect-[4/5] bg-canvas-sunken relative cursor-pointer"
+      >
+        {firstShot?.url ? (
+          <img src={firstShot.url} className="w-full h-full object-cover" alt="" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-ink-muted">
+            <Camera className="w-8 h-8" />
+          </div>
+        )}
+        {shotCount > 1 && (
+          <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px] font-semibold">
+            {shotCount}컷
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end justify-center pb-3 opacity-0 group-hover:opacity-100">
+          <span className="text-white text-[11px] font-semibold bg-black/60 px-2 py-1 rounded">불러오기</span>
+        </div>
+      </button>
+      <div className="px-2.5 py-2 flex items-center justify-between gap-1">
+        <span className="text-[10px] text-ink-muted font-medium tabular-nums">{dateLabel}</span>
+        <button
+          onClick={() => { if (confirm('이 화보 그룹을 삭제하시겠어요?')) onDelete(gen) }}
+          className="p-1 text-ink-muted/60 hover:text-red-500 transition-colors"
+          title="삭제"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
   )
 }
 
