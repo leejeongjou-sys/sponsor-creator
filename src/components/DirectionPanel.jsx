@@ -41,8 +41,8 @@ export function DirectionPanel({
   const availablePoses = POSE_PRESETS.filter((p) => availablePoseIds.includes(p.id))
 
   return (
-    <div className="w-full lg:flex-1 lg:min-w-[340px] flex flex-col h-full bg-white border-r border-[#EAEAEA] shrink-0 relative">
-      <div className="flex-1 overflow-y-auto p-5 sm:p-6 custom-scrollbar flex flex-col gap-5 pb-28">
+    <div className="w-full lg:flex-1 lg:min-w-[340px] min-h-0 flex flex-col h-full bg-white border-r border-[#EAEAEA] shrink-0 relative">
+      <div className="flex-1 min-h-0 p-5 sm:p-6 flex flex-col gap-5 pb-28 overflow-hidden">
 
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 rounded-md bg-ink text-white text-[10px] font-bold flex items-center justify-center">2</div>

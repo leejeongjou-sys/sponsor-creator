@@ -39,8 +39,8 @@ export function SourcePanel({
   const canAddMore = models.length < maxModels
 
   return (
-    <div className="lg:flex-[2] flex-1 lg:min-w-[400px] flex flex-col h-full bg-white border-r border-[#EAEAEA] shrink-0 relative">
-      <div className="flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar flex flex-col gap-3">
+    <div className="lg:flex-[2] flex-1 lg:min-w-[400px] min-h-0 flex flex-col h-full bg-white border-r border-[#EAEAEA] shrink-0 relative">
+      <div className="flex-1 min-h-0 p-4 sm:p-5 flex flex-col gap-3 overflow-hidden">
 
         <div className="flex items-center justify-between sticky top-0 bg-white z-10 -mx-4 px-4 sm:-mx-5 sm:px-5 -mt-4 pt-4 sm:-mt-5 sm:pt-5 pb-2 border-b border-[#EAEAEA]">
           <div className="flex items-center gap-2">

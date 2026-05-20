@@ -317,7 +317,7 @@ export default function App() {
     <div className="flex flex-col h-screen bg-canvas text-ink-soft overflow-hidden">
       <Header apiKey={settings.apiKey} onApiKeyChange={(v) => setSettings({ ...settings, apiKey: v })} />
 
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden w-full">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden w-full">
         <SourcePanel
           models={models}
           maxModels={MAX_MODELS}
