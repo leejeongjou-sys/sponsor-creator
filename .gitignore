@@ -7,3 +7,9 @@ dist-ssr
 .vercel
 .DS_Store
 *.log
+
+# Seed influencer high-res originals (committed only as compressed *.jpg)
+public/influencers/*_raw.jpg
+
+# Local IDE config
+.claude/settings.local.json

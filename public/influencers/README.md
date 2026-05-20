@@ -2,18 +2,22 @@
 
 These files are served as static assets at `/influencers/{name}.jpg` at runtime.
 
-Required files (referenced from `src/constants/seedInfluencers.js`):
+Current seed roster (defined in `src/constants/seedInfluencers.js`):
 
-| File | Identity | Default name shown in UI |
+| File | Name | Gender |
 |---|---|---|
-| `m1.jpg` | Korean male, short black hair, white tee | m1 |
-| `w1.jpg` | Korean female, medium straight hair, navy sweatshirt | w1 |
-| `m2.jpg` | Korean male, longer wet-look hair, white tee, earrings | m2 |
-| `w2.jpg` | Korean female, mid-length wavy hair, beige tee | w2 |
+| `jiho.jpg` | jiho | male |
+| `min.jpg`  | min  | female |
+| `pang.jpg` | pang | male |
+| `ryo.jpg`  | ryo  | female |
 
-Recommended specs:
-- JPG, 4:5 portrait orientation
-- ~1024px on the long side (kept small to ship quickly)
-- Clean face photo, neutral expression, plain background works best
+## Adding or replacing a seed
 
-After dropping new files here, run `npm run build` (Vercel auto-deploys on push).
+1. Drop the high-res original into this folder as `{name}_raw.jpg`
+2. Install sharp if needed: `npm install --no-save sharp`
+3. Run `node scripts/compress-seeds.mjs` to produce `{name}.jpg` (~100 KB, 1024px wide)
+4. Delete the `*_raw.jpg` files (they're gitignored anyway — they should never be committed)
+5. If renaming or adding entries, update `src/constants/seedInfluencers.js`
+6. Commit + push → Vercel auto-deploys
+
+Specs: JPG, 4:5 portrait or close. Plain background, neutral expression works best.

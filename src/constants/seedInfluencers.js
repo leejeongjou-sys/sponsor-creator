@@ -1,13 +1,16 @@
 // Developer-curated seed profiles. Always available to all users, cannot be deleted.
 // Files live in /public/influencers/ and are served as static assets.
 //
-// To add a new seed: drop the JPG into public/influencers/ and add an entry below.
+// Workflow to update seeds:
+//   1. Drop new high-res JPGs into public/influencers/ as {name}_raw.jpg
+//   2. Run `node scripts/compress-seeds.mjs` to compress to {name}.jpg
+//   3. Update the SEED_INFLUENCERS array below if names change
 
 export const SEED_INFLUENCERS = [
-  { id: 'm1', name: 'm1', gender: 'male',   faceUrl: '/influencers/m1.jpg' },
-  { id: 'w1', name: 'w1', gender: 'female', faceUrl: '/influencers/w1.jpg' },
-  { id: 'm2', name: 'm2', gender: 'male',   faceUrl: '/influencers/m2.jpg' },
-  { id: 'w2', name: 'w2', gender: 'female', faceUrl: '/influencers/w2.jpg' },
+  { id: 'jiho', name: 'jiho', gender: 'male',   faceUrl: '/influencers/jiho.jpg' },
+  { id: 'min',  name: 'min',  gender: 'female', faceUrl: '/influencers/min.jpg' },
+  { id: 'pang', name: 'pang', gender: 'male',   faceUrl: '/influencers/pang.jpg' },
+  { id: 'ryo',  name: 'ryo',  gender: 'female', faceUrl: '/influencers/ryo.jpg' },
 ]
 
 // Flag used by the UI to render seeds with a different style and hide the delete button.
