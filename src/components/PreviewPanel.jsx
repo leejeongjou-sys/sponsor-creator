@@ -61,7 +61,7 @@ export function PreviewPanel({
   }
 
   return (
-    <div className="lg:flex-[2] flex-1 lg:min-w-[400px] bg-canvas flex flex-col relative overflow-y-auto shrink-0 custom-scrollbar">
+    <div className="lg:flex-[3.6] flex-1 lg:min-w-[480px] bg-canvas flex flex-col relative overflow-y-auto shrink-0 custom-scrollbar">
       {cloudReady && (
         <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md border-b border-[#EAEAEA] px-4 py-2 flex items-center gap-1">
           <button
@@ -84,7 +84,7 @@ export function PreviewPanel({
       ) : isGenerating && !hasResults ? (
         <LoadingState modelImage={modelImage} />
       ) : hasResults ? (
-        <article className="w-full max-w-[470px] mx-auto bg-white sm:border sm:border-[#EAEAEA] sm:my-6 flex flex-col animate-scale-in sm:rounded-xl overflow-hidden shadow-studio">
+        <article className="w-full max-w-[840px] mx-auto bg-white sm:border sm:border-[#EAEAEA] sm:my-6 flex flex-col animate-scale-in sm:rounded-xl overflow-hidden shadow-studio">
           {/* Header */}
           <div className="h-14 px-3.5 flex items-center justify-between shrink-0 border-b border-[#F5F5F3]">
             <div className="flex items-center gap-3">
@@ -128,17 +128,29 @@ export function PreviewPanel({
               </div>
             )}
 
-            {/* Regenerate slot button */}
-            {current?.status !== 'loading' && (
-              <button
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); onRegenerateSlot(currentIndex) }}
-                className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/80 transition-colors"
-                title="이 컷만 다시 생성"
-              >
-                <RefreshCw className="w-3.5 h-3.5" strokeWidth={2} />
-              </button>
-            )}
+            {/* Top-right action stack: download + regenerate */}
+            <div className="absolute top-3 right-3 flex flex-col gap-1.5">
+              {current?.status === 'ok' && (
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); onDownload(currentIndex) }}
+                  className="bg-black/60 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/80 transition-colors"
+                  title="이 컷 다운로드"
+                >
+                  <Download className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+              )}
+              {current?.status !== 'loading' && (
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); onRegenerateSlot(currentIndex) }}
+                  className="bg-black/60 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/80 transition-colors"
+                  title="이 컷만 다시 생성"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+              )}
+            </div>
 
             {/* Click-to-zoom hint */}
             {!isZoomed && current?.status === 'ok' && (
@@ -195,6 +207,51 @@ export function PreviewPanel({
             <Bookmark className="w-6 h-6 text-ink cursor-pointer hover:text-ink-muted transition-colors" strokeWidth={1.8} />
           </div>
 
+          {/* Per-image thumbnail strip with per-cut download */}
+          {generatedResults.length > 1 && (
+            <div className="px-3.5 pt-2 pb-3 flex gap-1.5 overflow-x-auto hide-scrollbar border-t border-[#F5F5F3]">
+              {generatedResults.map((r, i) => {
+                const p = POSE_BY_ID[r.poseId]
+                const isCurrent = i === currentIndex
+                return (
+                  <div key={i} className="relative shrink-0 group/thumb">
+                    <button
+                      onClick={() => setCurrentIndex(i)}
+                      className={`w-16 aspect-[4/5] rounded-md overflow-hidden border-2 transition-all bg-canvas-sunken ${
+                        isCurrent ? 'border-accent shadow-studio' : 'border-transparent hover:border-[#B5B5B5]'
+                      }`}
+                      title={`${i + 1}컷${p ? ` · ${p.label}` : ''}`}
+                    >
+                      {r.status === 'ok' && r.url ? (
+                        <img src={r.url} className="w-full h-full object-cover" alt={`Cut ${i + 1}`} />
+                      ) : r.status === 'loading' ? (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 animate-spin text-ink-muted" />
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-red-50">
+                          <AlertTriangle className="w-4 h-4 text-red-400" />
+                        </div>
+                      )}
+                      <span className="absolute bottom-0.5 left-1 text-[9px] font-bold text-white bg-black/60 px-1 rounded-sm tabular-nums">
+                        {i + 1}
+                      </span>
+                    </button>
+                    {r.status === 'ok' && r.url && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onDownload(i) }}
+                        className="absolute top-0.5 right-0.5 bg-black/70 hover:bg-black text-white p-1 rounded-full opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                        title={`${i + 1}컷 다운로드`}
+                      >
+                        <Download className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* Caption preview (IG-look) */}
           <div className="px-4 pb-3">
             <p className="text-sm font-semibold mb-1">좋아요 12,345개</p>
@@ -224,25 +281,17 @@ export function PreviewPanel({
                 : <><Sparkles className="w-4 h-4" strokeWidth={2} /> {caption ? '캡션 다시 생성' : '캡션·해시태그 자동 생성'}</>
               }
             </button>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onDownload(currentIndex)}
-                disabled={current?.status !== 'ok'}
-                className="flex-1 bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft disabled:bg-canvas-sunken disabled:text-ink-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
-              >
-                <Download className="w-4 h-4" strokeWidth={2} /> 현재 컷 저장
-              </button>
-              {generatedResults.length > 1 && (
-                <button
-                  onClick={onDownloadAll}
-                  disabled={!generatedResults.some((r) => r.status === 'ok')}
-                  className="flex-1 bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft disabled:bg-canvas-sunken disabled:text-ink-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
-                  title="모든 컷을 한 번에 저장"
-                >
-                  <Download className="w-4 h-4" strokeWidth={2} /> 전체 {generatedResults.filter((r) => r.status === 'ok').length}장 저장
-                </button>
-              )}
-            </div>
+            <button
+              onClick={generatedResults.length > 1 ? onDownloadAll : () => onDownload(currentIndex)}
+              disabled={!generatedResults.some((r) => r.status === 'ok')}
+              className="w-full bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft disabled:bg-canvas-sunken disabled:text-ink-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
+              title={generatedResults.length > 1 ? '모든 컷을 한 번에 저장' : '이 컷을 다운로드'}
+            >
+              <Download className="w-4 h-4" strokeWidth={2} />
+              {generatedResults.length > 1
+                ? `전체 ${generatedResults.filter((r) => r.status === 'ok').length}장 저장`
+                : '이 컷 저장'}
+            </button>
             {cloudReady && (
               <button
                 onClick={handleSaveCurrent}
@@ -374,7 +423,7 @@ function SlotError({ onRetry }) {
 
 function LoadingState({ modelImage }) {
   return (
-    <article className="w-full max-w-[470px] mx-auto bg-white sm:border sm:border-[#EAEAEA] sm:my-6 flex flex-col animate-fade-in sm:rounded-xl overflow-hidden shadow-studio">
+    <article className="w-full max-w-[840px] mx-auto bg-white sm:border sm:border-[#EAEAEA] sm:my-6 flex flex-col animate-fade-in sm:rounded-xl overflow-hidden shadow-studio">
       <div className="h-14 px-3.5 flex items-center gap-3 border-b border-[#F5F5F3]">
         <div className="w-8 h-8 rounded-full insta-gradient p-[1.5px]">
           <div className="w-full h-full rounded-full border border-white overflow-hidden bg-white">

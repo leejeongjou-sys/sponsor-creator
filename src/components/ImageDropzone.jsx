@@ -1,6 +1,17 @@
 import { useRef, useState } from 'react'
 
-export function ImageDropzone({ onUpload, image, placeholder, icon: Icon, className = '', imgClassName = 'object-cover' }) {
+/**
+ * Reusable image dropzone.
+ *
+ * @param fitMode 'cover' (default): image fills the box and crops to fit.
+ *                'contain': image scales so its longest edge fits the box; whichever
+ *                axis hits the box limit first stops, and the other axis stays
+ *                proportional. Use for reference images where the whole frame matters.
+ */
+export function ImageDropzone({
+  onUpload, image, placeholder, icon: Icon,
+  className = '', imgClassName, fitMode = 'cover',
+}) {
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef(null)
 
@@ -17,6 +28,9 @@ export function ImageDropzone({ onUpload, image, placeholder, icon: Icon, classN
     if (file) onUpload(file)
   }
 
+  const resolvedImgClass = imgClassName
+    ?? (fitMode === 'contain' ? 'max-w-full max-h-full object-contain' : 'w-full h-full object-cover')
+
   return (
     <div
       onClick={() => inputRef.current?.click()}
@@ -27,7 +41,7 @@ export function ImageDropzone({ onUpload, image, placeholder, icon: Icon, classN
       className={`w-full border border-[#E5E5E5] rounded-lg cursor-pointer flex items-center justify-center relative overflow-hidden transition-all ${className} ${isDragging ? 'border-accent bg-accent/5' : image ? 'bg-white' : 'bg-canvas-sunken hover:bg-[#EFEFEC]'}`}
     >
       {image ? (
-        <img src={image} className={`w-full h-full pointer-events-none ${imgClassName}`} alt={placeholder} />
+        <img src={image} className={`pointer-events-none ${resolvedImgClass}`} alt={placeholder} />
       ) : (
         <div className="text-center p-2 text-ink-muted pointer-events-none">
           <Icon className={`w-6 h-6 mx-auto mb-1.5 transition-colors ${isDragging ? 'text-accent' : 'text-ink-muted/50'}`} strokeWidth={1.5} />

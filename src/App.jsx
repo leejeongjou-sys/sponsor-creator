@@ -21,6 +21,7 @@ import {
 } from './constants'
 
 const MAX_MODELS = 4
+const MAX_DETAILS = 3
 const emptyModel = () => ({ face: null, sponsor: null, details: [], category: 'top' })
 
 export default function App() {
@@ -97,7 +98,7 @@ export default function App() {
     try {
       const dataUrl = await fileToCompressedDataUrl(file, 768, 0.8)
       setModels((prev) => prev.map((m, i) => (
-        i === index && m.details.length < 5 ? { ...m, details: [...m.details, dataUrl] } : m
+        i === index && m.details.length < MAX_DETAILS ? { ...m, details: [...m.details, dataUrl] } : m
       )))
     } catch { notify('이미지 처리 실패', 'error') }
   }
@@ -320,6 +321,7 @@ export default function App() {
         <SourcePanel
           models={models}
           maxModels={MAX_MODELS}
+          maxDetails={MAX_DETAILS}
           onUpdateModel={updateModel}
           onAddModel={addModelSlot}
           onRemoveModel={removeModelSlot}

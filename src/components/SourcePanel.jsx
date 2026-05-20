@@ -7,7 +7,7 @@ import { ImageDropzone } from './ImageDropzone'
 import { ITEM_CATEGORIES, SEED_INFLUENCERS, isSeedInfluencer } from '../constants'
 
 export function SourcePanel({
-  models, maxModels,
+  models, maxModels, maxDetails = 3,
   onUpdateModel, onAddModel, onRemoveModel,
   onUploadModelField, onUploadModelDetail, onRemoveModelDetail,
   onLoadInfluencerAt,
@@ -62,8 +62,10 @@ export function SourcePanel({
               index={i}
               model={model}
               isOnly={models.length === 1}
+              maxDetails={maxDetails}
               onUpdate={(patch) => onUpdateModel(i, patch)}
               onRemove={() => onRemoveModel(i)}
+              onUploadFace={onUploadModelField(i, 'face')}
               onUploadSponsor={onUploadModelField(i, 'sponsor')}
               onUploadDetail={onUploadModelDetail(i)}
               onRemoveDetail={(di) => onRemoveModelDetail(i, di)}
@@ -98,8 +100,8 @@ export function SourcePanel({
             onUpload={onReferenceUpload} image={referenceImage}
             placeholder="포즈·무드·배경 참고"
             icon={ImageIcon}
-            className="min-h-[180px] max-h-[280px]"
-            imgClassName="object-contain bg-canvas-sunken"
+            className="min-h-[180px] max-h-[480px] bg-canvas-sunken"
+            fitMode="contain"
           />
           {referenceImage && (
             <p className="text-[10px] text-accent mt-1.5 flex items-center gap-1 font-medium">
@@ -133,20 +135,33 @@ export function SourcePanel({
 }
 
 function ModelCard({
-  index, model, isOnly, onUpdate, onRemove,
-  onUploadSponsor, onUploadDetail, onRemoveDetail,
+  index, model, isOnly, maxDetails, onUpdate, onRemove,
+  onUploadFace, onUploadSponsor, onUploadDetail, onRemoveDetail,
   onOpenFacePicker,
   cloudReady, isSavingProfile, onStartSaveProfile, onCancelSaveProfile,
   profileName, onProfileNameChange, onConfirmSaveProfile, savingProfile,
 }) {
   const detailInputRef = useRef(null)
   const sponsorInputRef = useRef(null)
+  const [draggingTarget, setDraggingTarget] = useState(null) // 'face' | 'sponsor' | 'details' | null
 
   const handleDetailDrop = (e) => {
     e.preventDefault(); e.stopPropagation()
-    const files = Array.from(e.dataTransfer.files).slice(0, 5 - model.details.length)
+    setDraggingTarget(null)
+    const files = Array.from(e.dataTransfer.files).slice(0, maxDetails - model.details.length)
     files.forEach(onUploadDetail)
   }
+
+  const makeDragHandlers = (target, onFile) => ({
+    onDragEnter: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingTarget(target) },
+    onDragLeave: (e) => { e.preventDefault(); e.stopPropagation(); setDraggingTarget(null) },
+    onDragOver:  (e) => { e.preventDefault(); e.stopPropagation(); if (draggingTarget !== target) setDraggingTarget(target) },
+    onDrop: (e) => {
+      e.preventDefault(); e.stopPropagation(); setDraggingTarget(null)
+      const file = e.dataTransfer.files?.[0]
+      if (file) onFile(file)
+    },
+  })
 
   const ready = model.face && model.sponsor
 
@@ -158,55 +173,75 @@ function ModelCard({
           {/* Index chip */}
           <div className="w-6 h-6 rounded-md bg-ink text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-1">{index + 1}</div>
 
-          {/* Face — 2x size */}
-          <button
-            onClick={onOpenFacePicker}
-            className={`w-24 h-24 rounded-lg overflow-hidden shrink-0 relative group transition-all border ${
-              model.face ? 'border-[#E5E5E5] hover:border-ink shadow-studio' : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
+          {/* Face — 2x size, drag-drop or click-to-pick */}
+          <div
+            {...makeDragHandlers('face', onUploadFace)}
+            className={`w-24 h-24 rounded-lg overflow-hidden shrink-0 relative group transition-all border-2 cursor-pointer ${
+              draggingTarget === 'face'
+                ? 'border-accent bg-accent/10'
+                : model.face
+                  ? 'border-[#E5E5E5] hover:border-ink shadow-studio'
+                  : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
             }`}
-            title="얼굴 선택"
+            onClick={onOpenFacePicker}
+            title="클릭: 프로필 선택 / 드래그: 새 파일 업로드"
           >
             {model.face ? (
-              <img src={model.face} className="w-full h-full object-cover" alt={`Face ${index + 1}`} />
+              <img src={model.face} className="w-full h-full object-cover pointer-events-none" alt={`Face ${index + 1}`} />
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-ink-muted/60">
+              <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-ink-muted/60 pointer-events-none">
                 <UserSquare2 className="w-7 h-7" strokeWidth={1.5} />
-                <span className="text-[9px] font-semibold">얼굴 선택</span>
+                <span className="text-[9px] font-semibold">{draggingTarget === 'face' ? '놓으세요' : '얼굴'}</span>
               </div>
             )}
-            {model.face && (
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                <span className="text-white text-[10px] font-bold">변경</span>
+            {model.face && draggingTarget !== 'face' && (
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all pointer-events-none">
+                <span className="text-white text-[10px] font-bold">클릭/드래그</span>
               </div>
             )}
-          </button>
+            {draggingTarget === 'face' && (
+              <div className="absolute inset-0 bg-accent/20 flex items-center justify-center pointer-events-none">
+                <span className="bg-accent text-white text-[10px] font-bold px-2 py-1 rounded-full">놓으세요</span>
+              </div>
+            )}
+          </div>
 
-          {/* Sponsor — 2x size */}
-          <button
-            onClick={() => sponsorInputRef.current?.click()}
-            className={`w-24 h-24 rounded-lg overflow-hidden shrink-0 relative group transition-all border ${
-              model.sponsor ? 'border-[#E5E5E5] hover:border-ink shadow-studio' : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
+          {/* Sponsor — 2x size, drag-drop or click */}
+          <div
+            {...makeDragHandlers('sponsor', onUploadSponsor)}
+            className={`w-24 h-24 rounded-lg overflow-hidden shrink-0 relative group transition-all border-2 cursor-pointer ${
+              draggingTarget === 'sponsor'
+                ? 'border-accent bg-accent/10'
+                : model.sponsor
+                  ? 'border-[#E5E5E5] hover:border-ink shadow-studio'
+                  : 'border-dashed border-[#D4D4D4] hover:border-ink bg-canvas-sunken'
             }`}
-            title="협찬 옷 업로드"
+            onClick={() => sponsorInputRef.current?.click()}
+            title="클릭: 파일 선택 / 드래그: 새 파일 업로드"
           >
             {model.sponsor ? (
-              <img src={model.sponsor} className="w-full h-full object-contain p-1.5 bg-canvas-sunken" alt={`Item ${index + 1}`} />
+              <img src={model.sponsor} className="w-full h-full object-contain p-1.5 bg-canvas-sunken pointer-events-none" alt={`Item ${index + 1}`} />
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-ink-muted/60">
+              <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-ink-muted/60 pointer-events-none">
                 <Shirt className="w-7 h-7" strokeWidth={1.5} />
-                <span className="text-[9px] font-semibold">옷 업로드</span>
+                <span className="text-[9px] font-semibold">{draggingTarget === 'sponsor' ? '놓으세요' : '옷'}</span>
               </div>
             )}
-            {model.sponsor && (
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                <span className="text-white text-[10px] font-bold">교체</span>
+            {model.sponsor && draggingTarget !== 'sponsor' && (
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all pointer-events-none">
+                <span className="text-white text-[10px] font-bold">클릭/드래그</span>
+              </div>
+            )}
+            {draggingTarget === 'sponsor' && (
+              <div className="absolute inset-0 bg-accent/20 flex items-center justify-center pointer-events-none">
+                <span className="bg-accent text-white text-[10px] font-bold px-2 py-1 rounded-full">놓으세요</span>
               </div>
             )}
             <input
               ref={sponsorInputRef} type="file" accept="image/*" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadSponsor(f); e.target.value = '' }}
             />
-          </button>
+          </div>
 
           {/* Action icons — vertical stack on the right */}
           <div className="flex flex-col gap-1 ml-auto">
@@ -247,9 +282,13 @@ function ModelCard({
             ))}
           </div>
 
-          {/* Detail strip */}
+          {/* Detail strip — drag-drop here too */}
           <div
-            className="flex-1 flex items-center gap-1.5 min-w-0 pl-2 border-l border-[#EAEAEA]"
+            className={`flex-1 flex items-center gap-1.5 min-w-0 pl-2 border-l rounded-r transition-colors ${
+              draggingTarget === 'details' ? 'bg-accent/10 border-accent border' : 'border-[#EAEAEA]'
+            }`}
+            onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); if (model.details.length < maxDetails) setDraggingTarget('details') }}
+            onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setDraggingTarget(null) }}
             onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
             onDrop={handleDetailDrop}
           >
@@ -266,7 +305,7 @@ function ModelCard({
                   </button>
                 </div>
               ))}
-              {model.details.length < 5 && (
+              {model.details.length < maxDetails && (
                 <button
                   onClick={() => detailInputRef.current?.click()}
                   className="w-12 h-12 shrink-0 border border-dashed border-[#D4D4D4] rounded flex items-center justify-center hover:bg-canvas-sunken hover:border-ink text-ink-muted"
@@ -275,14 +314,14 @@ function ModelCard({
                   <input
                     ref={detailInputRef} type="file" multiple accept="image/*" className="hidden"
                     onChange={(e) => {
-                      const files = Array.from(e.target.files).slice(0, 5 - model.details.length)
+                      const files = Array.from(e.target.files).slice(0, maxDetails - model.details.length)
                       files.forEach(onUploadDetail); e.target.value = ''
                     }}
                   />
                 </button>
               )}
             </div>
-            <span className="text-[9px] text-ink-muted/60 ml-auto self-center tabular-nums shrink-0">{model.details.length}/5</span>
+            <span className="text-[9px] text-ink-muted/60 ml-auto self-center tabular-nums shrink-0">{model.details.length}/{maxDetails}</span>
           </div>
         </div>
       </div>
