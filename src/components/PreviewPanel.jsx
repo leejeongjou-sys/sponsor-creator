@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  AlertTriangle, Bookmark, Camera, ChevronLeft, ChevronRight, Download,
-  Heart, MessageCircle, MoreHorizontal, RefreshCw, Send, ZoomIn,
+  AlertTriangle, Bookmark, Camera, ChevronLeft, ChevronRight, Check, Copy,
+  Download, Hash, Heart, Loader2, MessageCircle, MessageSquareText,
+  MoreHorizontal, RefreshCw, Send, Sparkles, ZoomIn,
 } from 'lucide-react'
 import { POSE_BY_ID, PRESETS } from '../constants'
 
 export function PreviewPanel({
   generatedResults, isGenerating, modelImage, bgType, selectedPreset,
   itemCategory, onDownload, onRegenerateSlot,
+  caption, isCaptioning, onGenerateCaption, notify,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isZoomed, setIsZoomed] = useState(false)
@@ -165,16 +167,35 @@ export function PreviewPanel({
             <Bookmark className="w-6 h-6 text-ink cursor-pointer hover:text-ink-muted transition-colors" strokeWidth={1.8} />
           </div>
 
-          {/* Caption + download */}
-          <div className="px-4 pb-4">
+          {/* Caption preview (IG-look) */}
+          <div className="px-4 pb-3">
             <p className="text-sm font-semibold mb-1">좋아요 12,345개</p>
-            <p className="text-sm leading-relaxed">
-              <span className="font-semibold mr-1.5">sponsor_creator</span>
-              새로운 컬렉션 OOTD ✨ {bgType === 'preset' ? presetName : '핫플레이스'}에서!
-              <span className="text-[#00376b] block mt-0.5 cursor-pointer">#협찬 #OOTD #데일리룩</span>
-            </p>
-            <p className="text-[10px] text-ink-muted mt-1.5 mb-3">1시간 전</p>
+            {caption ? (
+              <CaptionDisplay caption={caption} notify={notify} />
+            ) : (
+              <>
+                <p className="text-sm leading-relaxed">
+                  <span className="font-semibold mr-1.5">sponsor_creator</span>
+                  새로운 컬렉션 OOTD ✨ {bgType === 'preset' ? presetName : '핫플레이스'}에서!
+                  <span className="text-[#00376b] block mt-0.5">#협찬 #OOTD #데일리룩</span>
+                </p>
+                <p className="text-[10px] text-ink-muted mt-1.5">1시간 전</p>
+              </>
+            )}
+          </div>
 
+          {/* Action buttons */}
+          <div className="px-4 pb-4 flex flex-col gap-2">
+            <button
+              onClick={onGenerateCaption}
+              disabled={isCaptioning}
+              className="w-full bg-white border border-ink text-ink font-semibold py-2.5 rounded-lg hover:bg-canvas-sunken disabled:opacity-60 disabled:cursor-wait transition-colors flex items-center justify-center gap-1.5 text-sm active:scale-[0.99]"
+            >
+              {isCaptioning
+                ? <><Loader2 className="w-4 h-4 animate-spin" /> 캡션 생성 중…</>
+                : <><Sparkles className="w-4 h-4" strokeWidth={2} /> {caption ? '캡션 다시 생성' : '캡션·해시태그 자동 생성'}</>
+              }
+            </button>
             <button
               onClick={() => onDownload(currentIndex)}
               disabled={current?.status !== 'ok'}
@@ -187,6 +208,88 @@ export function PreviewPanel({
       ) : (
         <EmptyState />
       )}
+    </div>
+  )
+}
+
+function CaptionDisplay({ caption, notify }) {
+  const [tone, setTone] = useState(0)
+  const [copied, setCopied] = useState(null) // 'body' | 'tags' | 'full' | null
+
+  const body = caption.captions[tone]?.text || ''
+  const tags = caption.hashtags || []
+  const full = `${body}\n\n${tags.join(' ')}`
+
+  const copy = async (text, kind) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(kind)
+      if (notify) notify(`${kind === 'body' ? '본문' : kind === 'tags' ? '해시태그' : '전체'} 복사됨`)
+      setTimeout(() => setCopied(null), 1500)
+    } catch {
+      if (notify) notify('복사 실패', 'error')
+    }
+  }
+
+  return (
+    <div className="space-y-2.5 animate-fade-in">
+      {/* Tone tabs */}
+      <div className="flex gap-1 bg-canvas-sunken p-0.5 rounded-md">
+        {caption.captions.map((c, i) => (
+          <button
+            key={i}
+            onClick={() => setTone(i)}
+            className={`flex-1 py-1 text-[10px] font-semibold rounded transition-all ${tone === i ? 'bg-white shadow-studio text-ink' : 'text-ink-muted hover:text-ink'}`}
+          >
+            {c.tone}
+          </button>
+        ))}
+      </div>
+
+      {/* Body */}
+      <div className="relative group">
+        <p className="text-sm leading-relaxed whitespace-pre-line">
+          <span className="font-semibold mr-1.5">sponsor_creator</span>
+          {body}
+        </p>
+        <button
+          onClick={() => copy(body, 'body')}
+          className="absolute top-0 right-0 p-1 text-ink-muted opacity-0 group-hover:opacity-100 hover:text-ink transition-all"
+          title="본문 복사"
+        >
+          {copied === 'body' ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+
+      {/* Hashtags */}
+      <div className="relative group">
+        <div className="flex flex-wrap gap-1">
+          {tags.map((t) => (
+            <span key={t} className={`text-[11px] ${t === '#광고' || t === '#협찬' ? 'text-red-600 font-semibold' : 'text-[#00376b]'}`}>
+              {t}
+            </span>
+          ))}
+        </div>
+        <button
+          onClick={() => copy(tags.join(' '), 'tags')}
+          className="absolute top-0 right-0 p-1 text-ink-muted opacity-0 group-hover:opacity-100 hover:text-ink transition-all"
+          title="해시태그 복사"
+        >
+          {copied === 'tags' ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Hash className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+
+      {/* Copy-all */}
+      <button
+        onClick={() => copy(full, 'full')}
+        className="w-full mt-1 py-1.5 text-[11px] font-semibold rounded border border-[#E5E5E5] bg-white text-ink-soft hover:border-ink hover:text-ink transition-all flex items-center justify-center gap-1.5"
+      >
+        {copied === 'full' ? <><Check className="w-3 h-3 text-green-600" /> 전체 복사됨</> : <><MessageSquareText className="w-3 h-3" /> 본문 + 해시태그 전체 복사</>}
+      </button>
+
+      <p className="text-[10px] text-red-500 font-medium leading-tight">
+        ⚠️ #광고 #협찬 은 공정거래위원회 의무 표기입니다 (수정·삭제 시 과태료 대상).
+      </p>
     </div>
   )
 }

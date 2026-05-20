@@ -10,6 +10,7 @@ import { useNotification } from './hooks/useNotification'
 import { fileToCompressedDataUrl } from './lib/image'
 import { generateImage } from './lib/gemini'
 import { buildShot, prepareImageStrips } from './lib/promptBuilder'
+import { generateCaption } from './lib/captionGen'
 import { CAROUSEL_RECOMMENDATIONS, QUICK_RECOMMENDATIONS } from './constants'
 
 export default function App() {
@@ -47,6 +48,10 @@ export default function App() {
   // generatedResults[i]: { url: string, poseId: string, status: 'ok'|'loading'|'failed' }
   const [generatedResults, setGeneratedResults] = useState([])
 
+  // ── Caption state ──
+  const [caption, setCaption] = useState(null) // { captions: [{tone,text}], hashtags: [] }
+  const [isCaptioning, setIsCaptioning] = useState(false)
+
   // ── Upload handlers ──
   const uploadSingle = (setter) => async (file) => {
     if (!file) return
@@ -81,6 +86,7 @@ export default function App() {
     if (!images) return
 
     setIsGenerating(true)
+    setCaption(null) // clear previous caption when starting new batch
     setGeneratedResults(selectedPoses.map((poseId) => ({ url: null, poseId, status: 'loading' })))
 
     notify(`${selectedPoses.length}컷 생성 시작! (${mode === 'carousel' ? '약 30~60초' : '약 15~30초'} 소요)`)
@@ -144,6 +150,25 @@ export default function App() {
     }
   }
 
+  // ── Caption generation ──
+  const handleGenerateCaption = async () => {
+    if (!settings.apiKey) return notify('우측 상단에 API Key를 설정해주세요.', 'error')
+    setIsCaptioning(true)
+    try {
+      const result = await generateCaption({
+        apiKey: settings.apiKey,
+        itemCategory, bgType, selectedPreset, timeOfDay, lighting,
+        userDirection: prompt,
+      })
+      setCaption(result)
+      notify('캡션 생성 완료')
+    } catch (e) {
+      notify(String(e.message), 'error')
+    } finally {
+      setIsCaptioning(false)
+    }
+  }
+
   // ── Download a slot's image ──
   const handleDownload = (index) => {
     const url = generatedResults[index]?.url
@@ -203,6 +228,10 @@ export default function App() {
           itemCategory={itemCategory}
           onDownload={handleDownload}
           onRegenerateSlot={handleRegenerateSlot}
+          caption={caption}
+          isCaptioning={isCaptioning}
+          onGenerateCaption={handleGenerateCaption}
+          notify={notify}
         />
       </div>
 
