@@ -66,6 +66,25 @@ export const POSE_PRESETS = [
     id: 'street_turn', label: '뒤돌아보기', emoji: '👀', crop: 'full', faceMatch: true,
     en: 'Mid-stride walking shot where model turns to look back at camera over shoulder. Dynamic energetic pose, hair in motion.',
   },
+
+  // GROUP / COUPLE (다인 전용) ───────────────────────
+  // 이 프리셋들은 modelImages.length >= 2일 때만 추천 표시
+  {
+    id: 'group_walking', label: '나란히 워킹', emoji: '🚶‍♂️‍🚶', crop: 'full', faceMatch: true, group: true,
+    en: 'Full body shot of all people walking side by side together down a street, friendly natural energy, slightly staggered stride, candid moment.',
+  },
+  {
+    id: 'group_selfie', label: '단체 셀카', emoji: '🤳', crop: 'upper', faceMatch: true, group: true,
+    en: 'Selfie taken at arms length showing all people leaning in close together, upper body and faces visible, casual friendly SNS vibe.',
+  },
+  {
+    id: 'couple_candid', label: '커플 캔디드', emoji: '👫', crop: 'full', faceMatch: true, group: true,
+    en: 'Two people standing close together in a candid moment, one slightly behind or beside the other, soft mood, looking off-camera.',
+  },
+  {
+    id: 'group_sitting', label: '나란히 앉기', emoji: '🪑', crop: 'upper', faceMatch: true, group: true,
+    en: 'All people sitting side by side on a bench or step, relaxed casual lifestyle moment, looking at camera, half-body visible.',
+  },
 ]
 
 export const POSE_BY_ID = Object.fromEntries(POSE_PRESETS.map((p) => [p.id, p]))
@@ -84,9 +103,25 @@ export const QUICK_RECOMMENDATIONS = {
   bottom:['full_dynamic', 'lower_closeup'],
 }
 
-// 카테고리에서 사용 가능한 포즈 id 목록 (드롭다운 필터링용)
+// 카테고리에서 사용 가능한 포즈 id 목록 (단일 인물 기준)
 export const POSES_FOR_CATEGORY = {
-  outer: POSE_PRESETS.filter((p) => p.crop !== 'lower').map((p) => p.id),
-  top:   POSE_PRESETS.filter((p) => p.crop !== 'lower').map((p) => p.id),
-  bottom:POSE_PRESETS.filter((p) => p.crop !== 'upper').map((p) => p.id),
+  outer: POSE_PRESETS.filter((p) => p.crop !== 'lower' && !p.group).map((p) => p.id),
+  top:   POSE_PRESETS.filter((p) => p.crop !== 'lower' && !p.group).map((p) => p.id),
+  bottom:POSE_PRESETS.filter((p) => p.crop !== 'upper' && !p.group).map((p) => p.id),
 }
+
+// 다인 모드 전용 포즈 id 목록 (그룹 포즈 + 일반 풀바디 일부)
+export const GROUP_POSE_IDS = POSE_PRESETS.filter((p) => p.group).map((p) => p.id)
+export const POSES_FOR_GROUP = [
+  ...GROUP_POSE_IDS,
+  'full_dynamic',
+  'full_walking',
+  'street_candid',
+  'street_turn',
+]
+
+// 다인 모드 추천 5컷
+export const GROUP_CAROUSEL_RECOMMENDATIONS = [
+  'group_walking', 'couple_candid', 'group_selfie', 'street_candid', 'group_sitting',
+]
+export const GROUP_QUICK_RECOMMENDATIONS = ['group_walking', 'group_selfie']

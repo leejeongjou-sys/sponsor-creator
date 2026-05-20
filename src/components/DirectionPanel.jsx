@@ -3,13 +3,15 @@ import { Camera, Clock, Loader2, MapPin, RefreshCw, Sun, Wand2, X } from 'lucide
 import { ImageDropzone } from './ImageDropzone'
 import {
   BG_TYPES, GENERATION_MODES, LIGHTING_OPTIONS, POSE_BY_ID,
-  POSE_PRESETS, POSES_FOR_CATEGORY, PRESETS, PROMPT_SNIPPETS, TIME_OPTIONS,
+  POSE_PRESETS, POSES_FOR_CATEGORY, POSES_FOR_GROUP,
+  PRESETS, PROMPT_SNIPPETS, TIME_OPTIONS,
 } from '../constants'
 
 export function DirectionPanel({
   mode, onModeChange,
   selectedPoses, onSelectedPosesChange,
   itemCategory,
+  isGroup, modelCount,
   bgType, onBgTypeChange,
   selectedPreset, onPresetChange,
   customBgImage, onCustomBgUpload,
@@ -26,7 +28,9 @@ export function DirectionPanel({
     setPickerOpenAt(null)
   }
 
-  const availablePoseIds = POSES_FOR_CATEGORY[itemCategory] || POSES_FOR_CATEGORY.top
+  const availablePoseIds = isGroup
+    ? POSES_FOR_GROUP
+    : (POSES_FOR_CATEGORY[itemCategory] || POSES_FOR_CATEGORY.top)
   const availablePoses = POSE_PRESETS.filter((p) => availablePoseIds.includes(p.id))
 
   return (
@@ -60,7 +64,7 @@ export function DirectionPanel({
         {/* ── Pose slots ────────────────────────────── */}
         <div>
           <label className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            포즈 ({selectedPoses.length}컷)
+            포즈 ({selectedPoses.length}컷) {isGroup && <span className="text-accent text-[10px] normal-case">· {modelCount}인 모드</span>}
           </label>
           <div className={`grid gap-2 ${selectedPoses.length === 2 ? 'grid-cols-2' : 'grid-cols-5'}`}>
             {selectedPoses.map((poseId, i) => {
