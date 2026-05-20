@@ -40,3 +40,10 @@ export const BG_TYPES = [
   { id: 'preset', label: '명소 프리셋' },
   { id: 'custom', label: '직접 업로드' },
 ]
+
+export const GENERATION_MODES = [
+  { id: 'quick', label: '빠른 2컷', desc: '전신 + 클로즈업' },
+  { id: 'carousel', label: '캐러셀 5컷', desc: '포즈만 다른 5장' },
+]
+
+export * from './poses'

@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bookmark, Camera, ChevronLeft, ChevronRight, Download, Heart, MessageCircle, MoreHorizontal, Send, ZoomIn } from 'lucide-react'
-import { PRESETS } from '../constants'
+import {
+  AlertTriangle, Bookmark, Camera, ChevronLeft, ChevronRight, Download,
+  Heart, MessageCircle, MoreHorizontal, RefreshCw, Send, ZoomIn,
+} from 'lucide-react'
+import { POSE_BY_ID, PRESETS } from '../constants'
 
-export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgType, selectedPreset, onDownload }) {
+export function PreviewPanel({
+  generatedResults, isGenerating, modelImage, bgType, selectedPreset,
+  itemCategory, onDownload, onRegenerateSlot,
+}) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isZoomed, setIsZoomed] = useState(false)
   const [pan, setPan] = useState({ isDragging: false, startX: 0, startY: 0, tX: 0, tY: 0 })
@@ -12,7 +18,12 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
     setCurrentIndex(0)
     setIsZoomed(false)
     setPan({ isDragging: false, startX: 0, startY: 0, tX: 0, tY: 0 })
-  }, [generatedResults])
+  }, [generatedResults.length])
+
+  // Clamp currentIndex if results shrink
+  useEffect(() => {
+    if (currentIndex >= generatedResults.length) setCurrentIndex(Math.max(0, generatedResults.length - 1))
+  }, [generatedResults.length, currentIndex])
 
   const down = (e) => {
     if (e.target.closest('button')) return
@@ -35,6 +46,8 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
 
   const hasResults = generatedResults.length > 0
   const presetName = PRESETS.find((p) => p.id === selectedPreset)?.name
+  const current = generatedResults[currentIndex]
+  const currentPose = current ? POSE_BY_ID[current.poseId] : null
 
   return (
     <div className="flex-1 lg:min-w-[320px] bg-canvas flex flex-col relative overflow-y-auto shrink-0 custom-scrollbar">
@@ -42,6 +55,7 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
         <LoadingState modelImage={modelImage} />
       ) : hasResults ? (
         <article className="w-full max-w-[470px] mx-auto bg-white sm:border sm:border-[#EAEAEA] sm:my-6 flex flex-col animate-scale-in sm:rounded-xl overflow-hidden shadow-studio">
+          {/* Header */}
           <div className="h-14 px-3.5 flex items-center justify-between shrink-0 border-b border-[#F5F5F3]">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full insta-gradient p-[1.5px]">
@@ -57,6 +71,7 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
             <MoreHorizontal className="w-5 h-5 text-ink" strokeWidth={1.8} />
           </div>
 
+          {/* Image area */}
           <div
             className="relative w-full bg-canvas-sunken overflow-hidden shrink-0 group flex items-center justify-center select-none"
             onMouseDown={down}
@@ -65,13 +80,38 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
             onMouseLeave={up}
           >
             <div
-              className={`w-full aspect-[4/5] ${!pan.isDragging ? 'transition-transform duration-200' : ''} ${isZoomed ? 'cursor-move' : 'cursor-zoom-in'}`}
+              className={`w-full aspect-[4/5] ${!pan.isDragging ? 'transition-transform duration-200' : ''} ${current?.status === 'ok' ? (isZoomed ? 'cursor-move' : 'cursor-zoom-in') : 'cursor-default'}`}
               style={{ transform: isZoomed ? `translate(${pan.tX}px, ${pan.tY}px) scale(2.5)` : 'translate(0,0) scale(1)' }}
             >
-              <img src={generatedResults[currentIndex]} className="w-full h-full object-cover pointer-events-none" alt="Generated" draggable={false} />
+              {current?.status === 'ok' && current.url && (
+                <img src={current.url} className="w-full h-full object-cover pointer-events-none" alt="Generated" draggable={false} />
+              )}
+              {current?.status === 'loading' && <SlotLoader />}
+              {current?.status === 'failed' && <SlotError onRetry={() => onRegenerateSlot(currentIndex)} />}
             </div>
 
-            {!isZoomed && (
+            {/* Pose chip */}
+            {currentPose && (
+              <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full text-[11px] font-semibold flex items-center gap-1 pointer-events-none">
+                <span>{currentPose.emoji}</span>
+                <span>{currentPose.label}</span>
+              </div>
+            )}
+
+            {/* Regenerate slot button */}
+            {current?.status !== 'loading' && (
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onRegenerateSlot(currentIndex) }}
+                className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white p-1.5 rounded-full hover:bg-black/80 transition-colors"
+                title="이 컷만 다시 생성"
+              >
+                <RefreshCw className="w-3.5 h-3.5" strokeWidth={2} />
+              </button>
+            )}
+
+            {/* Click-to-zoom hint */}
+            {!isZoomed && current?.status === 'ok' && (
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
                 <div className="bg-black/50 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-[11px] font-semibold flex items-center gap-1.5">
                   <ZoomIn className="w-3.5 h-3.5" strokeWidth={2} /> 클릭하여 디테일 확인
@@ -79,6 +119,7 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
               </div>
             )}
 
+            {/* Carousel arrows */}
             {!isZoomed && generatedResults.length > 1 && (
               <>
                 <button
@@ -98,14 +139,23 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
                   <ChevronRight className="w-5 h-5 text-ink" strokeWidth={1.8} />
                 </button>
                 <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1 pointer-events-none">
-                  {generatedResults.map((_, idx) => (
-                    <div key={idx} className={`w-1.5 h-1.5 rounded-full transition-colors ${currentIndex === idx ? 'bg-accent' : 'bg-white/80'}`} />
+                  {generatedResults.map((r, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                        currentIndex === idx ? 'bg-accent' :
+                        r.status === 'failed' ? 'bg-red-400/80' :
+                        r.status === 'loading' ? 'bg-yellow-400/80 animate-pulse' :
+                        'bg-white/80'
+                      }`}
+                    />
                   ))}
                 </div>
               </>
             )}
           </div>
 
+          {/* IG-style action bar */}
           <div className="px-3.5 pt-3 pb-1 flex justify-between items-center">
             <div className="flex gap-3.5">
               <Heart className="w-6 h-6 text-ink hover:text-red-500 cursor-pointer transition-colors" strokeWidth={1.8} />
@@ -115,6 +165,7 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
             <Bookmark className="w-6 h-6 text-ink cursor-pointer hover:text-ink-muted transition-colors" strokeWidth={1.8} />
           </div>
 
+          {/* Caption + download */}
           <div className="px-4 pb-4">
             <p className="text-sm font-semibold mb-1">좋아요 12,345개</p>
             <p className="text-sm leading-relaxed">
@@ -126,7 +177,8 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
 
             <button
               onClick={() => onDownload(currentIndex)}
-              className="w-full bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
+              disabled={current?.status !== 'ok'}
+              className="w-full bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft disabled:bg-canvas-sunken disabled:text-ink-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
             >
               <Download className="w-4 h-4" strokeWidth={2} /> 현재 화보 저장하기
             </button>
@@ -135,6 +187,32 @@ export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgTyp
       ) : (
         <EmptyState />
       )}
+    </div>
+  )
+}
+
+function SlotLoader() {
+  return (
+    <div className="w-full h-full bg-canvas-sunken flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-10 h-10 rounded-full border-2 border-ink/15 border-t-ink animate-spin" />
+        <p className="text-[11px] font-semibold text-ink-soft">이 컷 생성 중…</p>
+      </div>
+    </div>
+  )
+}
+
+function SlotError({ onRetry }) {
+  return (
+    <div className="w-full h-full bg-red-50/50 flex flex-col items-center justify-center gap-3 p-6 text-center">
+      <AlertTriangle className="w-10 h-10 text-red-400" strokeWidth={1.5} />
+      <p className="text-xs font-semibold text-red-600">이 컷 생성 실패</p>
+      <button
+        onClick={onRetry}
+        className="px-3 py-1.5 bg-white border border-red-300 text-red-600 rounded-md text-[11px] font-semibold hover:bg-red-50 transition-colors flex items-center gap-1.5"
+      >
+        <RefreshCw className="w-3 h-3" /> 다시 시도
+      </button>
     </div>
   )
 }
@@ -157,8 +235,8 @@ function LoadingState({ modelImage }) {
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
             <div className="w-10 h-10 rounded-full border-2 border-ink/15 border-t-ink animate-spin" />
-            <p className="text-xs font-semibold text-ink-soft">2 컷 동시 생성 중…</p>
-            <p className="text-[10px] text-ink-muted">약 15~30초 소요됩니다</p>
+            <p className="text-xs font-semibold text-ink-soft">화보 생성 중…</p>
+            <p className="text-[10px] text-ink-muted">잠시만 기다려 주세요</p>
           </div>
         </div>
       </div>

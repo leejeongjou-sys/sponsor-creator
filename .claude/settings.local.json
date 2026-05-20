@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -c user.email=claude@local -c user.name=Claude commit -m ' *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "WebFetch(domain:sponsor-creator.vercel.app)",
+      "Bash(curl -sI https://sponsor-creator.vercel.app)",
+      "Bash(curl -s https://sponsor-creator.vercel.app)",
+      "Bash(git -c user.email=\"claude@local\" -c user.name=\"Claude\" add index.html)",
+      "Bash(git -c user.email=\"claude@local\" -c user.name=\"Claude\" commit -m \"Update meta description: 4컷 → 2컷\")",
+      "Bash(npx vite *)",
+      "Bash(git -c user.email=\"claude@local\" -c user.name=\"Claude\" add -A)"
+    ]
+  }
+}
