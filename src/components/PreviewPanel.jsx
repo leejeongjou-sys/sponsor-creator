@@ -1,0 +1,184 @@
+import { useEffect, useRef, useState } from 'react'
+import { Bookmark, Camera, ChevronLeft, ChevronRight, Download, Heart, MessageCircle, MoreHorizontal, Send, ZoomIn } from 'lucide-react'
+import { PRESETS } from '../constants'
+
+export function PreviewPanel({ generatedResults, isGenerating, modelImage, bgType, selectedPreset, onDownload }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isZoomed, setIsZoomed] = useState(false)
+  const [pan, setPan] = useState({ isDragging: false, startX: 0, startY: 0, tX: 0, tY: 0 })
+  const dragRef = useRef({ startX: 0, startY: 0 })
+
+  useEffect(() => {
+    setCurrentIndex(0)
+    setIsZoomed(false)
+    setPan({ isDragging: false, startX: 0, startY: 0, tX: 0, tY: 0 })
+  }, [generatedResults])
+
+  const down = (e) => {
+    if (e.target.closest('button')) return
+    dragRef.current = { startX: e.clientX, startY: e.clientY }
+    if (isZoomed) setPan((p) => ({ ...p, isDragging: true, startX: e.clientX - p.tX, startY: e.clientY - p.tY }))
+  }
+  const move = (e) => {
+    if (isZoomed && pan.isDragging) setPan((p) => ({ ...p, tX: e.clientX - p.startX, tY: e.clientY - p.startY }))
+  }
+  const up = (e) => {
+    if (e.target.closest('button')) return
+    setPan((p) => ({ ...p, isDragging: false }))
+    const dx = Math.abs(e.clientX - dragRef.current.startX)
+    const dy = Math.abs(e.clientY - dragRef.current.startY)
+    if (dx < 5 && dy < 5) {
+      setIsZoomed(!isZoomed)
+      if (!isZoomed) setPan({ isDragging: false, startX: 0, startY: 0, tX: 0, tY: 0 })
+    }
+  }
+
+  const hasResults = generatedResults.length > 0
+  const presetName = PRESETS.find((p) => p.id === selectedPreset)?.name
+
+  return (
+    <div className="flex-1 lg:min-w-[320px] bg-canvas flex flex-col relative overflow-y-auto shrink-0 custom-scrollbar">
+      {isGenerating && !hasResults ? (
+        <LoadingState modelImage={modelImage} />
+      ) : hasResults ? (
+        <article className="w-full max-w-[470px] mx-auto bg-white sm:border sm:border-[#EAEAEA] sm:my-6 flex flex-col animate-scale-in sm:rounded-xl overflow-hidden shadow-studio">
+          <div className="h-14 px-3.5 flex items-center justify-between shrink-0 border-b border-[#F5F5F3]">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full insta-gradient p-[1.5px]">
+                <div className="w-full h-full rounded-full border border-white overflow-hidden bg-white">
+                  {modelImage ? <img src={modelImage} className="w-full h-full object-cover" alt="Profile" /> : <div className="w-full h-full bg-canvas-sunken" />}
+                </div>
+              </div>
+              <div className="flex flex-col justify-center">
+                <h3 className="text-sm font-semibold leading-tight">sponsor_creator</h3>
+                <p className="text-[11px] text-ink-muted leading-tight">Sponsored</p>
+              </div>
+            </div>
+            <MoreHorizontal className="w-5 h-5 text-ink" strokeWidth={1.8} />
+          </div>
+
+          <div
+            className="relative w-full bg-canvas-sunken overflow-hidden shrink-0 group flex items-center justify-center select-none"
+            onMouseDown={down}
+            onMouseMove={move}
+            onMouseUp={up}
+            onMouseLeave={up}
+          >
+            <div
+              className={`w-full aspect-[4/5] ${!pan.isDragging ? 'transition-transform duration-200' : ''} ${isZoomed ? 'cursor-move' : 'cursor-zoom-in'}`}
+              style={{ transform: isZoomed ? `translate(${pan.tX}px, ${pan.tY}px) scale(2.5)` : 'translate(0,0) scale(1)' }}
+            >
+              <img src={generatedResults[currentIndex]} className="w-full h-full object-cover pointer-events-none" alt="Generated" draggable={false} />
+            </div>
+
+            {!isZoomed && (
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                <div className="bg-black/50 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-[11px] font-semibold flex items-center gap-1.5">
+                  <ZoomIn className="w-3.5 h-3.5" strokeWidth={2} /> 클릭하여 디테일 확인
+                </div>
+              </div>
+            )}
+
+            {!isZoomed && generatedResults.length > 1 && (
+              <>
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex((i) => (i > 0 ? i - 1 : generatedResults.length - 1)) }}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/95 rounded-full flex items-center justify-center shadow-studio hover:bg-white transition-all"
+                  aria-label="이전"
+                >
+                  <ChevronLeft className="w-5 h-5 text-ink" strokeWidth={1.8} />
+                </button>
+                <button
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex((i) => (i < generatedResults.length - 1 ? i + 1 : 0)) }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/95 rounded-full flex items-center justify-center shadow-studio hover:bg-white transition-all"
+                  aria-label="다음"
+                >
+                  <ChevronRight className="w-5 h-5 text-ink" strokeWidth={1.8} />
+                </button>
+                <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1 pointer-events-none">
+                  {generatedResults.map((_, idx) => (
+                    <div key={idx} className={`w-1.5 h-1.5 rounded-full transition-colors ${currentIndex === idx ? 'bg-accent' : 'bg-white/80'}`} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="px-3.5 pt-3 pb-1 flex justify-between items-center">
+            <div className="flex gap-3.5">
+              <Heart className="w-6 h-6 text-ink hover:text-red-500 cursor-pointer transition-colors" strokeWidth={1.8} />
+              <MessageCircle className="w-6 h-6 text-ink cursor-pointer hover:text-ink-muted transition-colors" strokeWidth={1.8} />
+              <Send className="w-6 h-6 text-ink cursor-pointer hover:text-ink-muted transition-colors" strokeWidth={1.8} />
+            </div>
+            <Bookmark className="w-6 h-6 text-ink cursor-pointer hover:text-ink-muted transition-colors" strokeWidth={1.8} />
+          </div>
+
+          <div className="px-4 pb-4">
+            <p className="text-sm font-semibold mb-1">좋아요 12,345개</p>
+            <p className="text-sm leading-relaxed">
+              <span className="font-semibold mr-1.5">sponsor_creator</span>
+              새로운 컬렉션 OOTD ✨ {bgType === 'preset' ? presetName : '핫플레이스'}에서!
+              <span className="text-[#00376b] block mt-0.5 cursor-pointer">#협찬 #OOTD #데일리룩</span>
+            </p>
+            <p className="text-[10px] text-ink-muted mt-1.5 mb-3">1시간 전</p>
+
+            <button
+              onClick={() => onDownload(currentIndex)}
+              className="w-full bg-ink text-white font-semibold py-2.5 rounded-lg hover:bg-ink-soft transition-colors flex items-center justify-center gap-1.5 text-sm shadow-studio active:scale-[0.99]"
+            >
+              <Download className="w-4 h-4" strokeWidth={2} /> 현재 화보 저장하기
+            </button>
+          </div>
+        </article>
+      ) : (
+        <EmptyState />
+      )}
+    </div>
+  )
+}
+
+function LoadingState({ modelImage }) {
+  return (
+    <article className="w-full max-w-[470px] mx-auto bg-white sm:border sm:border-[#EAEAEA] sm:my-6 flex flex-col animate-fade-in sm:rounded-xl overflow-hidden shadow-studio">
+      <div className="h-14 px-3.5 flex items-center gap-3 border-b border-[#F5F5F3]">
+        <div className="w-8 h-8 rounded-full insta-gradient p-[1.5px]">
+          <div className="w-full h-full rounded-full border border-white overflow-hidden bg-white">
+            {modelImage ? <img src={modelImage} className="w-full h-full object-cover" alt="Profile" /> : <div className="w-full h-full bg-canvas-sunken" />}
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <div className="h-3 w-28 bg-canvas-sunken rounded animate-pulse" />
+          <div className="h-2 w-16 bg-canvas-sunken rounded animate-pulse" />
+        </div>
+      </div>
+      <div className="w-full aspect-[4/5] bg-canvas-sunken relative overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 rounded-full border-2 border-ink/15 border-t-ink animate-spin" />
+            <p className="text-xs font-semibold text-ink-soft">2 컷 동시 생성 중…</p>
+            <p className="text-[10px] text-ink-muted">약 15~30초 소요됩니다</p>
+          </div>
+        </div>
+      </div>
+      <div className="p-4 space-y-2">
+        <div className="h-3 w-24 bg-canvas-sunken rounded animate-pulse" />
+        <div className="h-3 w-3/4 bg-canvas-sunken rounded animate-pulse" />
+        <div className="h-3 w-1/2 bg-canvas-sunken rounded animate-pulse" />
+      </div>
+    </article>
+  )
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center text-ink-muted h-full w-full text-center p-8">
+      <div className="w-20 h-20 rounded-full border-2 border-[#E5E5E5] flex items-center justify-center mb-4 bg-white">
+        <Camera className="w-8 h-8 text-ink-muted/50" strokeWidth={1.5} />
+      </div>
+      <h2 className="text-base font-semibold text-ink-soft mb-2">게시물 미리보기</h2>
+      <p className="text-sm font-normal text-ink-muted leading-relaxed">사진과 설정을 완료하고<br />&apos;새 게시물 만들기&apos;를 누르세요.</p>
+    </div>
+  )
+}
